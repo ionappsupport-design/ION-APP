@@ -43,8 +43,9 @@ export function addToRecycleBin(file: ScannedFile, backupPath?: string): Recycle
   const now = Date.now();
   const expiresAt = now + THIRTY_DAYS_MS;
 
+  const randomString = Math.random().toString(36).substring(2, 10);
   const newItem: RecycleBinItem = {
-    id: `bin_${now}_${crypto.randomUUID().substring(0, 8)}`,
+    id: `bin_${now}_${randomString}`,
     fileId: file.id,
     name: file.name,
     originalPath: file.path,
@@ -70,6 +71,11 @@ export async function restoreItemFromRecycleBin(binId: string): Promise<{ succes
     return { success: false };
   }
 
+  let newPath = target.originalPath;
+  let newNativeUri = target.fileData?.nativeUri;
+
+  let newSize = target.fileData?.size || target.size;
+
   // Trigger real physical file copy if backup exists
   if (target.backupPath) {
     const res = await executeRealPhysicalRestore(target.backupPath, target.name);
@@ -77,11 +83,29 @@ export async function restoreItemFromRecycleBin(binId: string): Promise<{ succes
       console.error(`Physical restore failed for ${target.name}: ${res.error}`);
       return { success: false };
     }
+    if (res.restoredPath) {
+      newPath = res.restoredPath;
+      // Using file:// URI for the restored file in Downloads
+      newNativeUri = 'file://' + res.restoredPath;
+    }
+    if (res.size) {
+      newSize = res.size;
+    }
   }
 
   const remaining = items.filter((i) => i.id !== binId);
   saveRecycleBin(remaining);
-  return { success: true, restoredFile: target.fileData };
+
+  const restoredFile: ScannedFile = {
+    ...target.fileData!,
+    id: `restored_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    path: newPath,
+    nativeUri: newNativeUri,
+    size: newSize,
+    thumbnailUrl: undefined // Clear old thumbnail so it regenerates
+  };
+
+  return { success: true, restoredFile };
 }
 
 import { registerPlugin } from '@capacitor/core';

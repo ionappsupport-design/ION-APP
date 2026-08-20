@@ -144,7 +144,7 @@ export const AndroidFrame: React.FC<AndroidFrameProps> = ({
             { tab: 'storage_overview' as NavigationTab, label: '11. Storage Overview', desc: '30-day storage trends' },
             { tab: 'monthly_report' as NavigationTab, label: '12. Monthly Report', desc: '6-month space saved chart' },
             { tab: 'security' as NavigationTab, label: '13. Security & Privacy', desc: 'Guaranteed privacy policy' },
-            { tab: 'settings' as NavigationTab, label: '14. Settings', desc: 'Auto scan & dark theme' },
+            { tab: 'settings' as NavigationTab, label: '14. Settings', desc: 'Theme & general settings' },
             { tab: 'help_support' as NavigationTab, label: '15. Help & Support', desc: 'FAQs & Realtime ticket' },
           ].map(item => (
             <button

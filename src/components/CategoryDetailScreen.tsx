@@ -29,6 +29,8 @@ function getThumbnailSrc(file: ScannedFile): string | null {
 interface CategoryDetailScreenProps {
   category: 'images' | 'videos' | 'documents' | 'audio' | string;
   files: ScannedFile[];
+  prefilteredFiles?: ScannedFile[];
+  title?: string;
   onBack: () => void;
   onClean: (filesToClean: ScannedFile[]) => void;
 }
@@ -36,6 +38,8 @@ interface CategoryDetailScreenProps {
 export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
   category,
   files,
+  prefilteredFiles,
+  title,
   onBack,
   onClean
 }) => {
@@ -44,6 +48,8 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
 
   // Filter files based on category
   const categoryFiles = useMemo(() => {
+    if (prefilteredFiles) return prefilteredFiles;
+    
     return files.filter(f => {
       if (category === 'images') {
         return f.category === 'screenshot' || f.category === 'image' || f.name.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif|svg)$/);
@@ -57,11 +63,23 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
       if (category === 'audio') {
         return f.category === 'audio' || f.name.toLowerCase().match(/\.(mp3|wav|m4a|flac|aac)$/);
       }
+      if (category === 'large') {
+        return f.category === 'large' || (f.size && f.size > 50 * 1024 * 1024);
+      }
+      if (category === 'screenshot') {
+        return f.category === 'screenshot';
+      }
+      if (category === 'blurry') {
+        return f.isBlurry;
+      }
+      if (category === 'other') {
+        return (f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp') && !f.isDuplicate && f.category !== 'screenshot' && f.category !== 'large' && !f.isBlurry;
+      }
       return false;
     });
-  }, [files, category]);
+  }, [files, category, prefilteredFiles]);
 
-  const totalSize = categoryFiles.reduce((sum, f) => sum + f.size, 0);
+  const totalSize = categoryFiles.reduce((sum, f) => sum + (f.size || 0), 0);
 
   const toggleSelection = (id: string) => {
     const newSet = new Set(selectedIds);
@@ -98,31 +116,31 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
     }
   };
 
-  const { title, icon } = getHeaderInfo();
+  const { title: defaultTitle, icon } = getHeaderInfo();
 
-  const isGridView = category === 'images' || category === 'videos';
+  const isGridView = category === 'images' || category === 'videos' || category === 'large' || !!prefilteredFiles;
 
   return (
     // Outer: full height flex column — header | scrollable content | sticky delete bar
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
 
       {/* Header */}
-      <header className="flex items-center gap-3 p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
-        <button
-          onClick={onBack}
-          className="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-transform"
-          aria-label="Back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 flex flex-col justify-center min-w-0">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            {icon}
-            <span className="truncate">{title}</span>
-          </h1>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {categoryFiles.length} items • {formatBytes(totalSize)}
-          </span>
+      <header className="flex items-center justify-between gap-3 p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onBack}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-lg font-bold capitalize">
+              {title || defaultTitle}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {categoryFiles.length} files • {formatBytes(totalSize)}
+            </p>
+          </div>
         </div>
         
         {categoryFiles.length > 0 && (

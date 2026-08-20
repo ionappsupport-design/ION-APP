@@ -26,10 +26,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onBack,
   onNavigate,
 }) => {
-  const [autoScanInterval, setAutoScanInterval] = useState<'Daily' | 'Weekly' | 'Monthly'>('Weekly');
-  const [isAutoScanDropdownOpen, setIsAutoScanDropdownOpen] = useState(false);
-
-  const [scanReminder, setScanReminder] = useState(settings.junkReminder ?? true);
   const [showStorageOnDashboard, setShowStorageOnDashboard] = useState(true);
   const [backupBeforeDelete, setBackupBeforeDelete] = useState(true);
   const [showRecommendations, setShowRecommendations] = useState(true);
@@ -67,67 +63,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </h2>
 
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-2 border border-slate-200/80 dark:border-slate-800 shadow-sm divide-y divide-slate-100 dark:divide-slate-800/60">
-            {/* Auto scan */}
-            <div className="flex items-center justify-between p-3.5">
-              <span className="text-sm font-bold text-slate-900 dark:text-white">
-                Auto scan
-              </span>
-              <div className="relative">
-                <button
-                  onClick={() => setIsAutoScanDropdownOpen(!isAutoScanDropdownOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200"
-                >
-                  <span>{autoScanInterval}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {isAutoScanDropdownOpen && (
-                  <div className="absolute right-0 mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-30 py-1">
-                    {(['Daily', 'Weekly', 'Monthly'] as const).map((interval) => (
-                      <button
-                        key={interval}
-                        onClick={() => {
-                          setAutoScanInterval(interval);
-                          setIsAutoScanDropdownOpen(false);
-                          
-                          // Convert interval to hours and schedule in native WorkManager
-                          let hours = 24 * 7; // Weekly default
-                          if (interval === 'Daily') hours = 24;
-                          if (interval === 'Monthly') hours = 24 * 30;
-                          
-                          IonNativeStorage.scheduleAutoClean({ intervalHours: hours }).catch(err => {
-                            console.error('Failed to schedule auto-clean', err);
-                          });
-                        }}
-                        className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        {interval}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Scan reminder toggle */}
-            <div className="flex items-center justify-between p-3.5">
-              <span className="text-sm font-bold text-slate-900 dark:text-white">
-                Scan reminder
-              </span>
-              <button
-                onClick={() => setScanReminder(!scanReminder)}
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  scanReminder ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
-                }`}
-              >
-                <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                    scanReminder ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
             {/* Show storage on dashboard */}
             <div className="flex items-center justify-between p-3.5">
               <span className="text-sm font-bold text-slate-900 dark:text-white">

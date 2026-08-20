@@ -20,6 +20,7 @@ interface ReviewSelectScreenProps {
   onContinueToBackup?: (selectedFiles: ScannedFile[]) => void;
   onProceedToClean?: (selectedFiles: ScannedFile[]) => void;
   onOpenDuplicateGroup?: () => void;
+  onNavigateToCategory?: (category: string) => void;
   onBack: () => void;
   onNavigate?: (tab: NavigationTab) => void;
 }
@@ -30,6 +31,7 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
   onContinueToBackup,
   onProceedToClean,
   onOpenDuplicateGroup,
+  onNavigateToCategory,
   onBack,
   onNavigate,
 }) => {
@@ -86,31 +88,31 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
     duplicate: {
       count: duplicateFiles.length,
       groups: duplicateHashes.size > 0 ? duplicateHashes.size : Math.ceil(duplicateFiles.length / 2),
-      size: duplicateFiles.reduce((sum, f) => sum + f.size, 0),
+      size: duplicateFiles.reduce((sum, f) => sum + (f.size || 0), 0),
       label: 'Duplicate Photos',
       files: duplicateFiles
     },
     large: {
       count: largeFiles.length,
-      size: largeFiles.reduce((sum, f) => sum + f.size, 0),
+      size: largeFiles.reduce((sum, f) => sum + (f.size || 0), 0),
       label: 'Large Files',
       files: largeFiles
     },
     screenshot: {
       count: screenshotFiles.length,
-      size: screenshotFiles.reduce((sum, f) => sum + f.size, 0),
+      size: screenshotFiles.reduce((sum, f) => sum + (f.size || 0), 0),
       label: 'Screenshots',
       files: screenshotFiles
     },
     blurry: {
       count: blurryFiles.length,
-      size: blurryFiles.reduce((sum, f) => sum + f.size, 0),
+      size: blurryFiles.reduce((sum, f) => sum + (f.size || 0), 0),
       label: 'Blurry Photos',
       files: blurryFiles
     },
     other: {
       count: otherFiles.length,
-      size: otherFiles.reduce((sum, f) => sum + f.size, 0),
+      size: otherFiles.reduce((sum, f) => sum + (f.size || 0), 0),
       label: 'Other Files',
       files: otherFiles
     },
@@ -292,13 +294,17 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
           {/* Large Files */}
           {(activeFilter === 'All' || activeFilter === 'Large') && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
+              <div 
+                className="flex items-center gap-3 flex-1 cursor-pointer"
+                onClick={() => onNavigateToCategory?.('large')}
+              >
                 <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                   <Video className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     Large Files
+                    <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
                   </div>
                   <div className="text-xs text-slate-400">
                     {categoryStats.large.count} files
@@ -328,13 +334,17 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
           {/* Screenshots */}
           {(activeFilter === 'All' || activeFilter === 'Screenshots') && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
+              <div 
+                className="flex items-center gap-3 flex-1 cursor-pointer"
+                onClick={() => onNavigateToCategory?.('screenshot')}
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     Screenshots
+                    <ChevronRight className="w-3.5 h-3.5 text-emerald-500" />
                   </div>
                   <div className="text-xs text-slate-400">
                     {categoryStats.screenshot.count} files
@@ -364,13 +374,17 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
           {/* Blurry Photos */}
           {(activeFilter === 'All' || activeFilter === 'Blurry') && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+              <div 
+                className="flex items-center gap-3 flex-1 cursor-pointer"
+                onClick={() => onNavigateToCategory?.('blurry')}
+              >
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center">
                   <ImageIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     Blurry Photos
+                    <ChevronRight className="w-3.5 h-3.5 text-rose-500" />
                   </div>
                   <div className="text-xs text-slate-400">
                     {categoryStats.blurry.count} files
@@ -400,13 +414,17 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
           {/* Other Files */}
           {(activeFilter === 'All' || activeFilter === 'Other') && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+              <div 
+                className="flex items-center gap-3 flex-1 cursor-pointer"
+                onClick={() => onNavigateToCategory?.('other')}
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     Other Files
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
                   </div>
                   <div className="text-xs text-slate-400">
                     {categoryStats.other.count} files

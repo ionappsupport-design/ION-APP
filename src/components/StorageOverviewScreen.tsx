@@ -54,23 +54,23 @@ export const StorageOverviewScreen: React.FC<StorageOverviewScreenProps> = ({
   // Compute dynamic category storage from scanned files or use native metrics
   const imageBytes = storageOverview.imageBytes ?? files
     .filter(f => f.category === 'image' || f.category === 'screenshot')
-    .reduce((sum, f) => sum + f.size, 0);
+    .reduce((sum, f) => sum + (f.size || 0), 0);
 
   const videoBytes = storageOverview.videoBytes ?? files
     .filter(f => f.category === 'video' || f.category === 'large')
-    .reduce((sum, f) => sum + f.size, 0);
+    .reduce((sum, f) => sum + (f.size || 0), 0);
 
   const docBytes = files
     .filter(f => f.category === 'document' || f.category === 'download')
-    .reduce((sum, f) => sum + f.size, 0);
+    .reduce((sum, f) => sum + (f.size || 0), 0);
 
   const audioBytes = storageOverview.audioBytes ?? files
     .filter(f => f.category === 'audio')
-    .reduce((sum, f) => sum + f.size, 0);
+    .reduce((sum, f) => sum + (f.size || 0), 0);
 
   const junkBytes = files
     .filter(f => f.isJunk || f.category === 'junk' || f.category === 'temp' || f.category === 'cache')
-    .reduce((sum, f) => sum + f.size, 0);
+    .reduce((sum, f) => sum + (f.size || 0), 0);
 
   const knownTotal = imageBytes + videoBytes + docBytes + audioBytes + junkBytes;
   const otherBytes = Math.max(0, storageOverview.usedBytes - knownTotal);

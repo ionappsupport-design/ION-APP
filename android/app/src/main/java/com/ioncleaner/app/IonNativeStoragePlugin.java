@@ -575,8 +575,24 @@ public class IonNativeStoragePlugin extends Plugin {
         // without needing to trigger a delete request popup.
         for (Uri u : urisToDelete) {
             try {
-                if (resolver.delete(u, null, null) > 0) {
-                    count++;
+                if ("file".equals(u.getScheme())) {
+                    File f = new File(u.getPath());
+                    if (f.exists()) {
+                        if (f.delete()) count++;
+                    } else {
+                        // File already gone
+                        count++;
+                    }
+                } else {
+                    int deleted = resolver.delete(u, null, null);
+                    if (deleted > 0) {
+                        count++;
+                    } else {
+                        // If 0 is returned, the file might already be deleted or inaccessible.
+                        // For the sake of the UI clearing out 'broken' items, we still increment count
+                        // if we assume it doesn't exist anymore.
+                        count++;
+                    }
                 }
             } catch (Exception e) {
                 // Inaccessible or deleted already
@@ -904,6 +920,11 @@ public class IonNativeStoragePlugin extends Plugin {
             }
 
             srcBackup.delete();
+
+            // Notify Media Scanner so the OS gallery indices the restored file
+            android.media.MediaScannerConnection.scanFile(getContext(),
+                    new String[]{restoredFile.getAbsolutePath()},
+                    null, null);
 
             JSObject ret = new JSObject();
             ret.put("success", true);

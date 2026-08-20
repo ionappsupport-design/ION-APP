@@ -258,10 +258,33 @@ export async function scanNativeStorage(): Promise<{
           category = 'large';
         }
 
+        // Social Media Tagging
+        let socialApp: 'WhatsApp' | 'Telegram' | 'Instagram' | undefined = undefined;
+        let socialCategory: 'sent' | 'received' | 'status' | 'voice' | 'sticker' | 'database' | undefined = undefined;
+        const lowPath = file.path.toLowerCase();
+
+        if (lowPath.includes('whatsapp')) {
+          socialApp = 'WhatsApp';
+          if (lowPath.includes('/sent/')) socialCategory = 'sent';
+          else if (lowPath.includes('/statuses/') || lowPath.includes('.statuses/')) socialCategory = 'status';
+          else if (lowPath.includes('voice notes')) socialCategory = 'voice';
+          else if (lowPath.includes('stickers')) socialCategory = 'sticker';
+          else if (lowPath.includes('databases') || lowPath.endsWith('.crypt14') || lowPath.endsWith('.crypt15')) socialCategory = 'database';
+          else socialCategory = 'received';
+        } else if (lowPath.includes('telegram')) {
+          socialApp = 'Telegram';
+          socialCategory = 'received'; // Telegram doesn't strictly separate Sent like WhatsApp in media store usually
+        } else if (lowPath.includes('instagram')) {
+          socialApp = 'Instagram';
+          socialCategory = 'received';
+        }
+
         allFiles.push({
           ...file,
           category,
           isJunk,
+          socialApp,
+          socialCategory,
           source: 'native',
           storageSource: 'mediastore',
         });
@@ -334,9 +357,31 @@ export async function scanSocialMediaNative(): Promise<{ files: ScannedFile[] }>
           else if (file.mimeType.startsWith('video/')) category = 'video';
           else if (file.mimeType.startsWith('audio/')) category = 'audio';
 
+          let socialApp: 'WhatsApp' | 'Telegram' | 'Instagram' | undefined = undefined;
+          let socialCategory: 'sent' | 'received' | 'status' | 'voice' | 'sticker' | 'database' | undefined = undefined;
+          const lowPath = file.path.toLowerCase();
+
+          if (lowPath.includes('whatsapp')) {
+            socialApp = 'WhatsApp';
+            if (lowPath.includes('/sent/')) socialCategory = 'sent';
+            else if (lowPath.includes('/statuses/') || lowPath.includes('.statuses/')) socialCategory = 'status';
+            else if (lowPath.includes('voice notes')) socialCategory = 'voice';
+            else if (lowPath.includes('stickers')) socialCategory = 'sticker';
+            else if (lowPath.includes('databases') || lowPath.endsWith('.crypt14') || lowPath.endsWith('.crypt15')) socialCategory = 'database';
+            else socialCategory = 'received';
+          } else if (lowPath.includes('telegram')) {
+            socialApp = 'Telegram';
+            socialCategory = 'received';
+          } else if (lowPath.includes('instagram')) {
+            socialApp = 'Instagram';
+            socialCategory = 'received';
+          }
+
           allFiles.push({
             ...file,
-            category,
+            category: category as any,
+            socialApp,
+            socialCategory,
             source: 'native',
             storageSource: 'mediastore', // treat as mediastore since it's just raw files
             securityStatus: 'safe',
@@ -444,9 +489,9 @@ export async function executePhysicalDeletion(filesToDelete: ScannedFile[]): Pro
     return { deletedCount, freedBytes, deletedFileIds, failedPaths };
   }
 
-  // 1. Group MediaStore files (explicit storageSource === 'mediastore' or content:// nativeUri)
+  // 1. Group MediaStore files (explicit storageSource === 'mediastore' or content:// or file:// nativeUri)
   const mediaStoreFiles = filesToDelete.filter(
-    (f) => (f.storageSource === 'mediastore' || f.nativeUri?.startsWith('content://')) && f.nativeUri
+    (f) => (f.storageSource === 'mediastore' || f.nativeUri?.startsWith('content://') || f.nativeUri?.startsWith('file://')) && f.nativeUri
   );
 
   if (mediaStoreFiles.length > 0) {
@@ -537,6 +582,7 @@ export async function executeRealBackup(file: ScannedFile): Promise<{
 export async function executeRealPhysicalRestore(backupPath: string, originalName: string): Promise<{
   success: boolean;
   restoredPath?: string;
+  size?: number;
   error?: string;
 }> {
   if (!Capacitor.isNativePlatform()) {

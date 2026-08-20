@@ -35,20 +35,29 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticketResult, setTicketResult] = useState<{ id: string; preview: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const faqs = [
     {
       q: 'How does ION detect duplicate photos safely?',
-      a: 'ION compares cryptographic pixel hashes and visual resolution metadata. It highlights the highest-resolution photo as "Best" and keeps it protected while selecting lower-quality duplicate copies for review.',
+      a: 'ION utilizes advanced cryptographic hashing combined with structural similarity index measure (SSIM) to scan your media on a pixel-by-pixel level. This allows it to identify exact duplicates, burst shots, and visually similar photos. Our smart algorithm automatically flags the highest resolution original as the "Best" photo, while selecting the inferior copies for safe removal. You always retain the original, highest quality memory.',
     },
     {
-      q: 'What is Backup Before Delete?',
-      a: 'Backup Before Delete stores a secure snapshot of your removed files in app storage and the 30-Day Recycle Bin so you can restore them at any time.',
+      q: 'Is my data safe and private when using ION?',
+      a: 'Absolutely. ION operates with a strict "Privacy First" offline architecture. All scanning, hashing, and duplicate detection happen entirely locally on your device. We do not upload your personal photos, videos, or files to any cloud servers. Your personal data never leaves your phone.',
     },
     {
-      q: 'How does MediaStore and SAF deletion work on Android?',
-      a: 'ION uses official Android MediaStore and Storage Access Framework system APIs to request confirmation and physically delete files from internal storage.',
+      q: 'What happens if I accidentally delete an important file?',
+      a: 'You are completely protected by ION\'s Secure 30-Day Recycle Bin architecture. When you clean files using ION, they are not immediately destroyed. Instead, they are securely moved to a hidden local backup vault on your device for 30 days. You can instantly restore any accidentally deleted file with a single tap from the Recycle Bin tab. After 30 days, files are permanently erased to free up space.',
     },
+    {
+      q: 'How does the Video Compressor reclaim so much space?',
+      a: 'Our built-in Video Compressor leverages hardware-accelerated H.264/HEVC transcoding algorithms. It optimizes bitrates and frame encoding without visibly affecting the human eye\'s perception of quality. By intelligently stripping out unnecessary metadata and compressing visual artifacts, ION can reduce large video file sizes by up to 80% while keeping them crisp and shareable.',
+    },
+    {
+      q: 'Why does ION need "All Files Access" (MANAGE_EXTERNAL_STORAGE)?',
+      a: 'To perform a comprehensive deep clean, ION requires the Android Storage Access Framework (SAF) permission. This permission allows ION to scan beyond standard media folders—it can detect hidden app caches, leftover junk from uninstalled apps, bloated WhatsApp databases, and temporary files scattered across your internal storage that standard gallery apps cannot see.',
+    }
   ];
 
   const handleTicketSubmit = async (e: React.FormEvent) => {
@@ -129,28 +138,48 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
               <div className="w-8 h-8 rounded-xl bg-cyan-900/30 text-cyan-400 flex items-center justify-center">
                 <Mail className="w-4 h-4" />
               </div>
-              <span className="text-sm font-bold text-white">
-                Contact Support (Realtime Email Ticket)
-              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white">Contact Support</span>
+                <span className="text-[10px] text-slate-400">ionapp.support@gmail.com</span>
+              </div>
             </div>
             <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showTicketForm ? 'rotate-90' : ''}`} />
           </button>
 
           {/* How ION works */}
-          <button 
-            onClick={() => onNavigate('storage_overview')}
-            className="w-full flex items-center justify-between p-3.5 text-left hover:bg-slate-800/40 rounded-2xl transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-900/30 text-emerald-400 flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4" />
+          <div className="p-3.5 border-b border-slate-800/60">
+            <div 
+              onClick={() => setShowHowItWorks(!showHowItWorks)}
+              className="flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-900/30 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-bold text-white">
+                  How ION Works
+                </span>
               </div>
-              <span className="text-sm font-bold text-white">
-                How ION Works
-              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showHowItWorks ? 'rotate-180' : ''}`} />
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-          </button>
+
+            {showHowItWorks && (
+              <div className="mt-3 p-3 bg-slate-800/50 rounded-2xl text-xs text-slate-400 leading-relaxed text-left space-y-3">
+                <p>
+                  <strong className="text-slate-200 block mb-0.5">1. Intelligent Scanning Engine</strong>
+                  ION's proprietary scanning algorithms deeply analyze your phone's internal storage in seconds, uncovering hidden caches, leftover app data, identical duplicate photos, and oversized media.
+                </p>
+                <p>
+                  <strong className="text-slate-200 block mb-0.5">2. Smart Selection & Safety</strong>
+                  We automatically categorize everything. Our algorithm identifies the highest quality "Best" photos and safely groups exact duplicates, ensuring you never lose important memories.
+                </p>
+                <p>
+                  <strong className="text-slate-200 block mb-0.5">3. 30-Day Recovery Architecture</strong>
+                  When you clean your storage, your files are securely moved to a 30-day Recycle Bin. You instantly get your storage space back, with the complete peace of mind that you can reverse any accidental deletion with a single tap.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Privacy Policy */}
           <button 

@@ -66,6 +66,8 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('splash');
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('images');
+  const [selectedSocialCategoryFiles, setSelectedSocialCategoryFiles] = useState<ScannedFile[] | undefined>(undefined);
+  const [categoryDetailBackTab, setCategoryDetailBackTab] = useState<NavigationTab>('storage_overview');
 
   // Staging for clean flow (Review -> Duplicate Group -> Backup -> Cleaning -> Complete)
   const [pendingCleanFiles, setPendingCleanFiles] = useState<ScannedFile[]>([]);
@@ -85,7 +87,7 @@ export default function App() {
       } else if (currentTab === 'duplicate_group') {
         setCurrentTab('review_select');
       } else if (currentTab === 'category_detail') {
-        setCurrentTab('storage_overview');
+        setCurrentTab(categoryDetailBackTab);
       } else if (currentTab === 'storage_overview' || currentTab === 'settings' || currentTab === 'security' || currentTab === 'monthly_report' || currentTab === 'recycle_bin' || currentTab === 'video_compressor') {
         setCurrentTab('home');
       } else if (currentTab === 'clean_complete') {
@@ -269,24 +271,34 @@ export default function App() {
 
     // Allow React to paint the 'cleaning' screen before freezing thread (async IIFE)
     (async () => {
-      // 1. Backup files into Recycle Bin first
-      for (const f of selectedFiles) {
-        const backupRes = await executeRealBackup(f);
-        addToRecycleBin(f, backupRes.backupPath);
+      try {
+        // 1. Backup files into Recycle Bin first
+        for (const f of selectedFiles) {
+          try {
+            const backupRes = await executeRealBackup(f);
+            if (backupRes.success) {
+              addToRecycleBin(f, backupRes.backupPath);
+            }
+          } catch (e) {
+            console.error('Backup failed for', f.name, e);
+          }
+        }
+        setRecycleBinItems(loadRecycleBin());
+
+        // 2. Perform physical deletion via Android MediaStore / SAF / Web store
+        const deletionRes = await executePhysicalDeletion(selectedFiles);
+
+        const deletedIds = new Set(deletionRes.deletedFileIds);
+        const finalRemainingFiles = files.filter(f => !deletedIds.has(f.id));
+        updateFiles(finalRemainingFiles);
+
+        setLastFreedBytes(deletionRes.freedBytes);
+        setLastFreedCount(deletionRes.deletedCount);
+      } catch (e) {
+        console.error('Deletion operation failed', e);
+      } finally {
+        setIsDeleting(false);
       }
-      setRecycleBinItems(loadRecycleBin());
-
-      // 2. Perform physical deletion via Android MediaStore / SAF / Web store
-      const deletionRes = await executePhysicalDeletion(selectedFiles);
-
-      const deletedIds = new Set(deletionRes.deletedFileIds);
-      const finalRemainingFiles = files.filter(f => !deletedIds.has(f.id));
-      updateFiles(finalRemainingFiles);
-
-      setLastFreedBytes(deletionRes.freedBytes);
-      setLastFreedCount(deletionRes.deletedCount);
-
-      setIsDeleting(false);
     })();
   };
 
@@ -350,7 +362,7 @@ export default function App() {
             else if (lowerName.match(/\.(tmp|log|cache|part|thumb)$/)) cat = 'junk';
 
             scannedRealFiles.push({
-              id: `real_${Date.now()}_${crypto.randomUUID().substring(0, 4)}`,
+              id: `real_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
               name: file.name,
               size: file.size,
               path: `/${dirHandle.name}/${file.name}`,
@@ -483,6 +495,11 @@ export default function App() {
             onProceedToClean={handleProceedToCleanFromReview}
             onContinueToBackup={handleProceedToCleanFromReview}
             onOpenDuplicateGroup={() => setCurrentTab('duplicate_group')}
+            onNavigateToCategory={(cat) => {
+              setSelectedCategory(cat);
+              setCategoryDetailBackTab('review_select');
+              setCurrentTab('category_detail');
+            }}
             onNavigate={(tab) => setCurrentTab(tab)}
             onBack={() => setCurrentTab('scan_results')}
           />
@@ -550,7 +567,12 @@ export default function App() {
           <SocialCleanerScreen
             files={files}
             onBack={() => setCurrentTab('home')}
-            onCleanCategoryFiles={handleProceedToCleanFromReview}
+            onReviewCategory={(categoryTitle, filesToReview) => {
+              setSelectedCategory(categoryTitle);
+              setSelectedSocialCategoryFiles(filesToReview);
+              setCategoryDetailBackTab('social_cleaner');
+              setCurrentTab('category_detail');
+            }}
             onScanFolder={handleSelectRealFolder}
           />
         )}
@@ -564,6 +586,7 @@ export default function App() {
             onNavigate={(tab, payload) => {
               if (tab === 'category_detail' && payload) {
                 setSelectedCategory(payload);
+                setCategoryDetailBackTab('storage_overview');
               }
               setCurrentTab(tab);
             }}
@@ -574,8 +597,13 @@ export default function App() {
         {currentTab === 'category_detail' && (
           <CategoryDetailScreen
             category={selectedCategory}
+            title={selectedSocialCategoryFiles ? selectedCategory : undefined}
             files={files}
-            onBack={() => setCurrentTab('storage_overview')}
+            prefilteredFiles={selectedSocialCategoryFiles}
+            onBack={() => {
+              setSelectedSocialCategoryFiles(undefined);
+              setCurrentTab(categoryDetailBackTab);
+            }}
             onClean={(filesToClean) => executeClean(filesToClean)}
           />
         )}

@@ -40,6 +40,11 @@ export interface ScannedFile {
   securityReason?: string;
   isJunk?: boolean;
   junkType?: 'system_cache' | 'temp_file' | 'obsolete_log' | 'thumbnail_cache' | 'app_residual';
+  
+  // Social Media Metadata
+  socialApp?: 'WhatsApp' | 'Telegram' | 'Instagram';
+  socialCategory?: 'sent' | 'received' | 'status' | 'voice' | 'sticker' | 'database';
+
   selected?: boolean;
   blob?: Blob;
 }

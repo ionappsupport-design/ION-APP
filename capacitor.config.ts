@@ -3,7 +3,8 @@ const config = {
   appName: 'Ion Cleaner',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    url: 'http://192.168.1.101:3000',
+    cleartext: true
   },
   plugins: {
     Filesystem: {
