@@ -122,11 +122,11 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                       <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/80 flex items-center justify-center shrink-0 overflow-hidden relative">
                         {vid.thumbnailUrl || vid.nativeUri ? (
                           vid.thumbnailUrl ? (
-                            <img src={vid.thumbnailUrl} alt={vid.name} className="absolute inset-0 w-full h-full object-cover" />
+                            <img src={vid.thumbnailUrl} alt={vid.name} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
                           ) : (
                             <video 
                               src={Capacitor.convertFileSrc(vid.nativeUri!)}
-                              className="absolute inset-0 w-full h-full object-cover opacity-80"
+                              className="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none"
                               preload="metadata"
                               muted
                             />
