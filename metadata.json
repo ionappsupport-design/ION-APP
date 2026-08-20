@@ -1,0 +1,6 @@
+{
+  "name": "ION - Clean Storage & Speed",
+  "description": "Native Android utility application for device storage cleanup, junk removal, video compression, security scanning, system monitoring, and recycle bin management.",
+  "requestFramePermissions": ["storage-access"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

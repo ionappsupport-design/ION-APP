@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can read and update their own document, but NOT their trial/pro status
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow create if creating own record
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Allow update, but block updating any trial or entitlement fields to prevent client-side cracking
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                      'isLifetimePro', 
+                      'trialStatus', 
+                      'trialExpiry', 
+                      'trialStart', 
+                      'paymentVerified', 
+                      'lastPaymentId', 
+                      'lastOrderId',
+                      'upgradedAt'
+                    ]));
+    }
+
+    // Support tickets: Users can create their own, but not read others
+    match /support_tickets/{ticketId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+  }
+}

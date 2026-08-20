@@ -1,0 +1,285 @@
+import React from 'react';
+import { motion } from 'motion/react';
+import { 
+  Menu, 
+  Bell, 
+  Sparkles,
+  Zap,
+  CheckCircle2,
+  Box,
+  Layers
+} from 'lucide-react';
+import { StorageOverview, ScannedFile, CleaningRecommendation, NavigationTab, DeviceSystemMetrics } from '../types';
+import { formatBytes } from '../utils/formatters';
+import { IonLogo } from './IonLogo';
+interface DashboardScreenProps {
+  storageOverview: StorageOverview;
+  files: ScannedFile[];
+  recommendations: CleaningRecommendation[];
+  systemMetrics: DeviceSystemMetrics;
+  onStartScan: () => void;
+  onNavigate: (tab: NavigationTab) => void;
+  onOpenDrawer: () => void;
+  unreadNotificationsCount?: number;
+  isPro?: boolean;
+}
+
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({
+  storageOverview,
+  files,
+  recommendations,
+  systemMetrics,
+  onStartScan,
+  onNavigate,
+  onOpenDrawer,
+  unreadNotificationsCount = 1,
+  isPro = false,
+}) => {
+  // Compute Recoverable Space
+  const computedRecoverableBytes = recommendations.reduce((acc, rec) => acc + rec.recoverableBytes, 0);
+  const displayRecoverableBytes = computedRecoverableBytes;
+
+  // Storage Numbers
+  const totalGB = storageOverview.totalBytes > 0 
+    ? (storageOverview.totalBytes / (1024 * 1024 * 1024)).toFixed(1) 
+    : '0';
+  const usedGB = storageOverview.usedBytes > 0 
+    ? (storageOverview.usedBytes / (1024 * 1024 * 1024)).toFixed(1) 
+    : '0';
+  const availableGB = storageOverview.availableBytes > 0 
+    ? (storageOverview.availableBytes / (1024 * 1024 * 1024)).toFixed(1) 
+    : '0';
+  const usedPercentage = storageOverview.usedPercentage || 0;
+
+  // Circle SVG Math for ION Ring
+  const radius = 86;
+  const strokeWidth = 14;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (usedPercentage / 100) * circumference;
+
+  return (
+    <div className="flex flex-col min-h-full pb-20 select-none bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
+      {/* Top App Header */}
+      <header className="sticky top-0 z-30 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-800/50">
+        <button
+          onClick={onOpenDrawer}
+          className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-transform"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Center Logo */}
+        <div className="flex items-center">
+          <IonLogo size="sm" showTagline={false} />
+        </div>
+
+        {/* Notification Bell */}
+        <button
+          onClick={() => onNavigate('help_support')}
+          className="relative p-2.5 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-transform"
+          aria-label="Notifications"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadNotificationsCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+          )}
+        </button>
+      </header>
+
+      {/* Main Screen Content */}
+      <main className="p-4 space-y-5">
+        {/* Hero Storage Gauge: The Signature ION Ring */}
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-200/70 dark:border-slate-800 flex flex-col items-center relative overflow-hidden">
+          
+          {/* ION Ring Gauge Container */}
+          <div className="relative w-56 h-56 flex items-center justify-center my-2">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
+              <defs>
+                <linearGradient id="ionRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#2563EB" />
+                  <stop offset="50%" stopColor="#06B6D4" />
+                  <stop offset="100%" stopColor="#10B981" />
+                </linearGradient>
+                <filter id="ringGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#06B6D4" floodOpacity="0.25" />
+                </filter>
+              </defs>
+
+              {/* Background Track */}
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                className="stroke-slate-100 dark:stroke-slate-800"
+                strokeWidth={strokeWidth}
+                fill="none"
+              />
+
+              {/* Glowing Dynamic Foreground Ring */}
+              <motion.circle
+                cx="100"
+                cy="100"
+                r={radius}
+                stroke="url(#ionRingGradient)"
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeDasharray={circumference}
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                strokeLinecap="round"
+                filter="url(#ringGlow)"
+              />
+            </svg>
+
+            {/* Inner Ring Text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none">
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">
+                Storage
+              </span>
+              <div className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                {usedGB} <span className="text-xl font-bold text-slate-400">GB</span>
+              </div>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                used
+              </span>
+            </div>
+          </div>
+
+          {/* Subtitle Under Ring */}
+          <div className="text-center mt-2 mb-4">
+            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              {availableGB} GB available
+            </span>
+          </div>
+
+          {/* Recoverable Space Banner with 3D Clean Box Graphic */}
+          <div className="w-full bg-blue-50/80 dark:bg-blue-950/40 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                ION found
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {files.length === 0 ? "Ready to Scan" : formatBytes(displayRecoverableBytes)}
+              </div>
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                {files.length === 0 ? "Tap below to find junk" : "Potentially recoverable"}
+              </div>
+            </div>
+
+            {/* Clean Box Visual Graphic */}
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 p-0.5 shadow-md shadow-blue-500/20 flex items-center justify-center">
+              <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center">
+                <Box className="w-7 h-7 text-blue-600 dark:text-cyan-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* Primary Action Button: SCAN & CLEAN */}
+          <button
+            onClick={onStartScan}
+            className="w-full mt-5 relative group overflow-hidden bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-cyan-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-5 h-5 text-cyan-200" />
+            <span className="tracking-wide">SCAN & CLEAN</span>
+            <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
+          </button>
+        </div>
+
+        {/* 3 Quick Status Cards */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Memory Card */}
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm">
+            <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mb-1">
+              Memory
+            </div>
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+              {systemMetrics.ramAvailableGb !== null && systemMetrics.ramAvailableGb !== undefined ? `${systemMetrics.ramAvailableGb} GB` : 'Available'}
+            </div>
+            <div className="text-[10px] font-medium text-emerald-500 mt-0.5">
+              {systemMetrics.ramTotalGb ? `of ${systemMetrics.ramTotalGb} GB` : 'RAM'}
+            </div>
+          </div>
+
+          {/* Battery Card */}
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm">
+            <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mb-1">
+              Battery
+            </div>
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+              {systemMetrics.batteryLevel !== null && systemMetrics.batteryLevel !== undefined ? `${systemMetrics.batteryLevel}%` : 'Normal'}
+            </div>
+            <div className="text-[10px] font-medium text-cyan-500 mt-0.5">
+              {systemMetrics.batteryHealth || 'Good'}
+            </div>
+          </div>
+
+          {/* System Info Card */}
+          <button
+            onClick={() => onNavigate('security')}
+            className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm hover:border-blue-500/50 transition-colors"
+          >
+            <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mb-1">
+              Security
+            </div>
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+              Status
+            </div>
+            <div className="text-[10px] font-medium text-emerald-500 mt-0.5">
+              Protected
+            </div>
+          </button>
+        </div>
+
+        {/* Specialized Cleaning Tools Grid */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+            Specialized Storage Tools
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onNavigate('social_cleaner')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-left shadow-sm hover:border-blue-500/50 transition-all group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-full">Cleaner</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                  Social Cleaner
+                </h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  WhatsApp & Telegram media
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate('video_compressor')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-left shadow-sm hover:border-purple-500/50 transition-all group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-purple-500 bg-purple-50 dark:bg-purple-950 px-2 py-0.5 rounded-full">Tool</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-purple-600 transition-colors">
+                  Video Compressor
+                </h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Shrink videos safely
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
