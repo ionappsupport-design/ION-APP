@@ -41,6 +41,20 @@ export const DuplicateGroupScreen: React.FC<DuplicateGroupScreenProps> = ({
     }));
   };
 
+  const isAllSelected = Object.keys(selectedFileIds).length === duplicateCopies.length && duplicateCopies.length > 0;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedFileIds({});
+    } else {
+      const allSelected: Record<string, boolean> = {};
+      duplicateCopies.forEach(f => {
+        allSelected[f.id] = true;
+      });
+      setSelectedFileIds(allSelected);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full select-none bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
       {/* Scrollable content */}
@@ -61,14 +75,34 @@ export const DuplicateGroupScreen: React.FC<DuplicateGroupScreenProps> = ({
           </div>
         </header>
 
-        {/* Subtitle / Stat Banner */}
+        {/* Subtitle / Stat Banner with Select All */}
         <div className="flex items-center justify-between px-1 mb-4">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {duplicates.length > 0 ? `${duplicates.length} duplicate items` : 'No duplicates detected'}
-          </span>
-          <span className="text-xs font-bold text-blue-600 dark:text-cyan-400">
-            {formatBytes(totalFreeableBytes)} recoverable
-          </span>
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {duplicates.length > 0 ? `${duplicates.length} duplicate items` : 'No duplicates detected'}
+            </span>
+            <span className="text-xs font-bold text-blue-600 dark:text-cyan-400">
+              {formatBytes(totalFreeableBytes)} recoverable
+            </span>
+          </div>
+          {duplicates.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 active:scale-95 transition-transform"
+            >
+              {isAllSelected ? (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
+                  Select All
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Dynamic Photo List or Empty State */}

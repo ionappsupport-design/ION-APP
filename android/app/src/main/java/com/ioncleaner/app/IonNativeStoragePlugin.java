@@ -147,7 +147,7 @@ public class IonNativeStoragePlugin extends Plugin {
     @PluginMethod
     public void getStorageOverview(PluginCall call) {
         try {
-            // Use external storage directory (user-facing storage) instead of data directory
+            // Use external storage directory for StatFs to get accurate user storage stats
             File path = Environment.getExternalStorageDirectory();
             StatFs stat = new StatFs(path.getPath());
 
@@ -228,11 +228,12 @@ public class IonNativeStoragePlugin extends Plugin {
             boolean images = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
             boolean video = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
             boolean audio = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED;
+            boolean partial = Build.VERSION.SDK_INT >= 34 && ContextCompat.checkSelfPermission(getContext(), "android.permission.READ_MEDIA_VISUAL_USER_SELECTED") == PackageManager.PERMISSION_GRANTED;
 
-            ret.put("images", images);
-            ret.put("video", video);
+            ret.put("images", images || partial);
+            ret.put("video", video || partial);
             ret.put("audio", audio);
-            ret.put("granted", images || video || audio);
+            ret.put("granted", images || video || audio || partial);
             ret.put("isTiramisu", true);
         } else {
             boolean readStorage = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
@@ -320,6 +321,8 @@ public class IonNativeStoragePlugin extends Plugin {
         int vidOffset = call.getInt("videoOffset", 0);
         int audLimit = call.getInt("audioLimit", 2000);
         int audOffset = call.getInt("audioOffset", 0);
+        int docLimit = call.getInt("documentLimit", 2000);
+        int docOffset = call.getInt("documentOffset", 0);
 
         JSArray filesArray = new JSArray();
         int skippedCount = 0;
@@ -327,9 +330,11 @@ public class IonNativeStoragePlugin extends Plugin {
         long totalImageBytes = 0;
         long totalVideoBytes = 0;
         long totalAudioBytes = 0;
+        long totalDocumentBytes = 0;
         int imgCount = 0;
         int vidCount = 0;
         int audCount = 0;
+        int docCount = 0;
 
         ContentResolver resolver = getContext().getContentResolver();
 
@@ -395,7 +400,9 @@ public class IonNativeStoragePlugin extends Plugin {
                 }
             }
         } catch (Throwable e) {
-            skippedCount++;
+            e.printStackTrace();
+            call.reject("Image scan failed: " + e.getMessage());
+            return;
         }
 
         // 2. Scan Videos
@@ -459,7 +466,9 @@ public class IonNativeStoragePlugin extends Plugin {
                 }
             }
         } catch (Throwable e) {
-            skippedCount++;
+            e.printStackTrace();
+            call.reject("Video scan failed: " + e.getMessage());
+            return;
         }
 
         // 3. Scan Audio
@@ -522,6 +531,81 @@ public class IonNativeStoragePlugin extends Plugin {
                 }
             }
         } catch (Throwable e) {
+            e.printStackTrace();
+            call.reject("Audio scan failed: " + e.getMessage());
+            return;
+        }
+
+        // 4. Scan Documents (PDFs, Word, Excel, Text)
+        try {
+            Uri filesUri = MediaStore.Files.getContentUri("external");
+            String[] projection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
+                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.RELATIVE_PATH } :
+                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED };
+
+            String selection = MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.pdf' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.doc' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.docx' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.xls' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.xlsx' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.txt' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.csv' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.zip' OR " +
+                               MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.rar'";
+
+            try (Cursor cursor = resolver.query(filesUri, projection, selection, null, MediaStore.MediaColumns.DATE_MODIFIED + " DESC")) {
+                if (cursor != null) {
+                    int idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID);
+                    int nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME);
+                    int sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE);
+                    int mimeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE);
+                    int dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED);
+                    int relPathCol = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ? cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH) : -1;
+
+                    while (cursor.moveToNext()) {
+                        try {
+                            long size = !cursor.isNull(sizeCol) ? Math.max(0, cursor.getLong(sizeCol)) : 0;
+                            totalDocumentBytes += size;
+                            totalBytes += size;
+                            
+                            if (cursor.getPosition() < docOffset) continue;
+                            if (docCount >= docLimit) break;
+                            docCount++;
+
+                            long id = cursor.getLong(idCol);
+                            String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("document_" + id);
+                            String mimeType = !cursor.isNull(mimeCol) ? cursor.getString(mimeCol) : "application/pdf";
+                            long dateModified = !cursor.isNull(dateCol) ? cursor.getLong(dateCol) : (System.currentTimeMillis() / 1000L);
+                            String relPath = (relPathCol != -1 && !cursor.isNull(relPathCol)) ? cursor.getString(relPathCol) : "";
+
+                            if (name == null || name.trim().isEmpty()) name = "document_" + id;
+                            if (mimeType == null || mimeType.trim().isEmpty()) mimeType = "application/pdf";
+
+                            Uri contentUri = ContentUris.withAppendedId(filesUri, id);
+
+                            JSObject fileObj = new JSObject();
+                            fileObj.put("id", "mediastore_doc_" + id);
+                            fileObj.put("name", name);
+                            fileObj.put("size", size);
+                            fileObj.put("path", relPath != null && !relPath.isEmpty() ? relPath + name : name);
+                            fileObj.put("source", "native");
+                            fileObj.put("storageSource", "mediastore");
+                            fileObj.put("nativeUri", contentUri.toString());
+                            fileObj.put("mediaStoreId", String.valueOf(id));
+                            fileObj.put("category", "document");
+                            fileObj.put("mimeType", mimeType);
+                            fileObj.put("lastModified", dateModified * 1000L);
+                            fileObj.put("securityStatus", "safe");
+                            fileObj.put("isJunk", false);
+
+                            filesArray.put(fileObj);
+                        } catch (Throwable itemEx) {
+                            skippedCount++;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable e) {
             skippedCount++;
         }
 
@@ -534,6 +618,7 @@ public class IonNativeStoragePlugin extends Plugin {
         result.put("imageBytes", totalImageBytes);
         result.put("videoBytes", totalVideoBytes);
         result.put("audioBytes", totalAudioBytes);
+        result.put("documentBytes", totalDocumentBytes);
         call.resolve(result);
     }
 
@@ -571,8 +656,6 @@ public class IonNativeStoragePlugin extends Plugin {
         ContentResolver resolver = getContext().getContentResolver();
         int count = 0;
 
-        // Since the app requires MANAGE_EXTERNAL_STORAGE, we can directly delete MediaStore files
-        // without needing to trigger a delete request popup.
         for (Uri u : urisToDelete) {
             try {
                 if ("file".equals(u.getScheme())) {
@@ -580,28 +663,50 @@ public class IonNativeStoragePlugin extends Plugin {
                     if (f.exists()) {
                         if (f.delete()) count++;
                     } else {
-                        // File already gone
                         count++;
                     }
                 } else {
+                    // Try to get the physical file path first
+                    String filePath = null;
+                    try (Cursor c = resolver.query(u, new String[]{MediaStore.MediaColumns.DATA}, null, null, null)) {
+                        if (c != null && c.moveToFirst()) {
+                            int dataIndex = c.getColumnIndex(MediaStore.MediaColumns.DATA);
+                            if (dataIndex != -1) {
+                                filePath = c.getString(dataIndex);
+                            }
+                        }
+                    } catch (Exception e) {}
+
+                    // Attempt MediaStore delete
                     int deleted = resolver.delete(u, null, null);
+                    
                     if (deleted > 0) {
                         count++;
-                    } else {
-                        // If 0 is returned, the file might already be deleted or inaccessible.
-                        // For the sake of the UI clearing out 'broken' items, we still increment count
-                        // if we assume it doesn't exist anymore.
-                        count++;
+                    } else if (filePath != null) {
+                        // Fallback: try deleting the physical file directly if MediaStore fails
+                        File f = new File(filePath);
+                        if (f.exists() && f.delete()) {
+                            count++;
+                        }
                     }
                 }
             } catch (Exception e) {
+                // Fallback attempt for SecurityException (Android 11+ without manage external storage)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && e instanceof SecurityException) {
+                    try {
+                        // On Android 11+, if we lack MANAGE_EXTERNAL_STORAGE, we must use createDeleteRequest.
+                        // However, the app requests MANAGE_EXTERNAL_STORAGE. If we reach here, it failed.
+                        // We will add it to the pending list for an activity callback if we wanted to support it,
+                        // but since we process synchronously, we just count this as a failure.
+                    } catch (Exception ex) {}
+                }
                 // Inaccessible or deleted already
             }
         }
 
         JSObject ret = new JSObject();
         ret.put("deletedCount", count);
-        ret.put("success", count > 0);
+        ret.put("success", count > 0 || urisToDelete.isEmpty());
         call.resolve(ret);
     }
 
@@ -839,7 +944,7 @@ public class IonNativeStoragePlugin extends Plugin {
                     if (mimeType.startsWith("image/") || ext.matches("jpg|jpeg|png|webp|gif|heic|svg")) {
                         category = name.toLowerCase().contains("screenshot") ? "screenshot" : "image";
                     } else if (mimeType.startsWith("video/") || ext.matches("mp4|mkv|mov|avi|webm|3gp")) {
-                        category = (size > 50 * 1024 * 1024) ? "large" : "video";
+                     category = (size > 20 * 1024 * 1024) ? "large" : "video";
                     } else if (mimeType.startsWith("audio/") || ext.matches("mp3|wav|m4a|flac|aac|ogg")) {
                         category = "audio";
                     } else if (ext.matches("tmp|temp|cache|log|bak|part|thumb")) {
@@ -978,7 +1083,10 @@ public class IonNativeStoragePlugin extends Plugin {
             Uri srcUri = Uri.parse(uriStr);
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = 4; 
-            Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(srcUri), null, options);
+            Bitmap bitmap;
+            try (InputStream in = getContext().getContentResolver().openInputStream(srcUri)) {
+                bitmap = BitmapFactory.decodeStream(in, null, options);
+            }
             
             if (bitmap == null) {
                 call.reject("Failed to decode image");
@@ -1036,7 +1144,10 @@ public class IonNativeStoragePlugin extends Plugin {
             Uri srcUri = Uri.parse(uriStr);
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = 8;
-            Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(srcUri), null, options);
+            Bitmap bitmap;
+            try (InputStream in = getContext().getContentResolver().openInputStream(srcUri)) {
+                bitmap = BitmapFactory.decodeStream(in, null, options);
+            }
             if (bitmap == null) {
                 call.reject("Failed to decode image");
                 return;
@@ -1087,7 +1198,10 @@ public class IonNativeStoragePlugin extends Plugin {
             Uri srcUri = Uri.parse(uriStr);
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = 8; // Small thumbnail
-            Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(srcUri), null, options);
+            Bitmap bitmap;
+            try (InputStream in = getContext().getContentResolver().openInputStream(srcUri)) {
+                bitmap = BitmapFactory.decodeStream(in, null, options);
+            }
             
             if (bitmap != null) {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -1413,17 +1527,15 @@ public class IonNativeStoragePlugin extends Plugin {
             String newFileName = "IonCompressed_" + System.currentTimeMillis() + ".mp4";
             java.io.File destFile = new java.io.File(moviesDir, newFileName);
 
-            java.io.FileInputStream in = new java.io.FileInputStream(sourceFile);
-            java.io.FileOutputStream out = new java.io.FileOutputStream(destFile);
+            try (java.io.FileInputStream in = new java.io.FileInputStream(sourceFile);
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(destFile)) {
 
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = in.read(buffer)) > 0) {
-                out.write(buffer, 0, length);
+                byte[] buffer = new byte[8192]; // Optimize buffer size
+                int length;
+                while ((length = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, length);
+                }
             }
-
-            in.close();
-            out.close();
 
             // Notify Media Scanner so it shows up in Gallery
             android.media.MediaScannerConnection.scanFile(getContext(),

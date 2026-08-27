@@ -1,3 +1,65 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Safe Area Insets (for notch / punch-hole / gesture bar devices) ─── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* ─── Prevent system font scaling from breaking layout (Samsung etc.) ─── */
+html {
+  font-size: 16px !important;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ─── Smooth scrolling & prevent pull-to-refresh on Android ─── */
+body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Prevent text selection on UI elements ─── */
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ─── Scrollbar hiding for cleaner mobile look ─── */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Dynamic viewport height utility (fixes 100vh on Android WebView) ─── */
+.h-dvh {
+  height: 100dvh;
+}
+.min-h-dvh {
+  min-height: 100dvh;
+}
+
+/* ─── Safe area padding utilities ─── */
+.pt-safe {
+  padding-top: var(--sat);
+}
+.pb-safe {
+  padding-bottom: var(--sab);
+}
+
+/* ─── Focus ring reset for better mobile aesthetics ─── */
+button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+button:focus:not(:focus-visible) {
+  outline: none;
+}

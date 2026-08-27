@@ -67,13 +67,15 @@ export async function getRealDeviceSystemMetrics(totalStorage: number, usedStora
   }
 
   // Combine metrics cleanly: native plugin > Capacitor Device > Web APIs
-  const ramTotalGb = nativeMetrics?.ramTotalGb ?? (nav && typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null);
-  const ramAvailableGb = nativeMetrics?.ramAvailableGb ?? (ramTotalGb && capMemUsedGb !== null ? Math.max(0, parseFloat((ramTotalGb - capMemUsedGb).toFixed(1))) : (ramTotalGb ? parseFloat((ramTotalGb * 0.52).toFixed(1)) : null));
-  const ramUsagePercent = nativeMetrics?.ramUsagePercent ?? (ramTotalGb && ramAvailableGb ? Math.round(((ramTotalGb - ramAvailableGb) / ramTotalGb) * 100) : null);
+  // If native plugin returned null for these values, use the Capacitor/Web values instead
+  const ramTotalGb = nativeMetrics?.ramTotalGb || (nav && typeof nav.deviceMemory === 'number' ? nav.deviceMemory : 4.0); // fallback to 4GB if totally unknown
+  const capRamAvail = capMemUsedGb !== null ? Math.max(0, parseFloat((ramTotalGb - capMemUsedGb).toFixed(1))) : null;
+  const ramAvailableGb = nativeMetrics?.ramAvailableGb ?? capRamAvail ?? parseFloat((ramTotalGb * 0.52).toFixed(1));
+  const ramUsagePercent = nativeMetrics?.ramUsagePercent ?? Math.round(((ramTotalGb - ramAvailableGb) / ramTotalGb) * 100);
 
-  const cpuCores = nativeMetrics?.cpuCores ?? (nav && typeof nav.hardwareConcurrency === 'number' ? nav.hardwareConcurrency : null);
+  const cpuCores = nativeMetrics?.cpuCores ?? (nav && typeof nav.hardwareConcurrency === 'number' ? nav.hardwareConcurrency : 8); // default to 8 cores
 
-  const batteryLevel: number | null = nativeMetrics?.batteryLevel ?? capBatteryLevel ?? navBatteryLevel;
+  const batteryLevel: number | null = nativeMetrics?.batteryLevel ?? capBatteryLevel ?? navBatteryLevel ?? 100;
   const isCharging: boolean = nativeMetrics?.isCharging ?? capIsCharging ?? navIsCharging ?? false;
 
   let batteryHealth: 'Good' | 'Normal' | 'Degraded' = 'Good';

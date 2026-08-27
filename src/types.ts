@@ -68,6 +68,7 @@ export interface StorageOverview {
   imageBytes?: number;
   videoBytes?: number;
   audioBytes?: number;
+  documentBytes?: number;
 }
 
 export interface JunkCategory {
@@ -103,7 +104,7 @@ export interface CleaningRecommendation {
   fileCount: number;
   type: 'duplicates' | 'screenshots' | 'large_files' | 'junk' | 'temp' | 'social';
   files: ScannedFile[];
-  badgeColor: 'blue' | 'green' | 'amber' | 'cyan';
+  badgeColor: 'blue' | 'green' | 'amber' | 'cyan' | 'purple';
 }
 
 export interface DeviceSystemMetrics {
@@ -122,6 +123,44 @@ export interface DeviceSystemMetrics {
   batteryHealth: 'Good' | 'Normal' | 'Degraded';
   osVersion?: string;
   isNativeData?: boolean;
+}
+
+export type SupportedRegion = 'IN' | 'US' | 'GB' | 'GLOBAL';
+
+export interface PaymentPlan {
+  id: 'monthly' | 'annual' | 'lifetime';
+  title: string;
+  tagline: string;
+  price: number;
+  originalPrice?: number;
+  currency: 'INR' | 'USD' | 'GBP' | string;
+  currencySymbol: string;
+  billingPeriod: string;
+  badge?: string;
+  isPopular?: boolean;
+  features: string[];
+}
+
+export interface ProMembership {
+  isPro: boolean;
+  planId: 'monthly' | 'annual' | 'lifetime' | 'trial' | null;
+  planName: string | null;
+  paymentId?: string;
+  orderId?: string;
+  signature?: string;
+  purchasedAt?: number;
+  expiresAt?: number | null; // null for lifetime
+  amountPaid?: number;
+  currency?: string;
+  status: 'active' | 'expired' | 'free' | 'trial';
+  isTrial?: boolean;
+  trialDaysLeft?: number;
+}
+
+export interface RazorpaySuccessResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
 }
 
 export interface TrialState {
@@ -203,4 +242,6 @@ export type NavigationTab =
   | 'settings'
   | 'no_items_found'
   | 'help_support'
-  | 'category_detail';
+  | 'category_detail'
+  | 'upgrade_pro'
+  | 'device_performance';

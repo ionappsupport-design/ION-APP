@@ -2,13 +2,17 @@ const config = {
   appId: 'com.ioncleaner.app',
   appName: 'Ion Cleaner',
   webDir: 'dist',
-  server: {
-    url: 'http://192.168.1.101:3000',
-    cleartext: true
+  backgroundColor: '#0B1120',
+  android: {
+    backgroundColor: '#0B1120',
   },
   plugins: {
     Filesystem: {
       persistDirectory: true
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com']
     }
   }
 };

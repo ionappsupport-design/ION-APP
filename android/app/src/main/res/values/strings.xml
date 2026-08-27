@@ -4,4 +4,5 @@
     <string name="title_activity_main">Ion Cleaner</string>
     <string name="package_name">com.ioncleaner.app</string>
     <string name="custom_url_scheme">com.ioncleaner.app</string>
+    <string name="default_web_client_id">994277632531-jfes1rr0a52khpjei7bgm5hkp1c6d9s1.apps.googleusercontent.com</string>
 </resources>

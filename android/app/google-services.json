@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "994277632531",
+    "project_id": "ion-cleaner",
+    "storage_bucket": "ion-cleaner.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:994277632531:android:032af935b97250192bade6",
+        "android_client_info": {
+          "package_name": "com.ioncleaner.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "994277632531-30ljkus7d78vhq0r5li5en1t1m41hu01.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ioncleaner.app",
+            "certificate_hash": "eaf4cbb2fa2bc8deb5e60d8c814888562b7c3c6a"
+          }
+        },
+        {
+          "client_id": "994277632531-jfes1rr0a52khpjei7bgm5hkp1c6d9s1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJxVM-uS_UpMz2pwqu0EKjHjE8-JUkBbE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "994277632531-jfes1rr0a52khpjei7bgm5hkp1c6d9s1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

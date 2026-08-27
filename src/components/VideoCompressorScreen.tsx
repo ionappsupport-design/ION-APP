@@ -15,6 +15,7 @@ import {
 import { ScannedFile } from '../types';
 import { formatBytes } from '../utils';
 import { compressVideoFile, saveVideoToGallery } from '../services/videoCompressor';
+import toast from 'react-hot-toast';
 
 interface VideoCompressorScreenProps {
   files: ScannedFile[];
@@ -119,21 +120,8 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                           : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/80 flex items-center justify-center shrink-0 overflow-hidden relative">
-                        {vid.thumbnailUrl || vid.nativeUri ? (
-                          vid.thumbnailUrl ? (
-                            <img src={vid.thumbnailUrl} alt={vid.name} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-                          ) : (
-                            <video 
-                              src={Capacitor.convertFileSrc(vid.nativeUri!)}
-                              className="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none"
-                              preload="metadata"
-                              muted
-                            />
-                          )
-                        ) : (
-                          <Video className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        )}
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600/30 to-purple-600/30 flex items-center justify-center shrink-0 overflow-hidden relative border border-blue-500/20">
+                        <Video className="w-5 h-5 text-blue-400" />
                       </div>
                       <div className="max-w-[120px]">
                         <p className="text-xs font-bold truncate">{vid.name}</p>
@@ -149,22 +137,38 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-sm">
                 
                 {/* Video Preview */}
-                <div className="w-full h-48 bg-slate-100 dark:bg-slate-800/60 rounded-2xl overflow-hidden shadow-inner relative flex items-center justify-center group">
+                <div className="w-full aspect-[9/16] bg-slate-100 dark:bg-slate-800/60 rounded-2xl overflow-hidden shadow-inner relative flex items-center justify-center group mx-auto max-w-[280px]">
                   {selectedVideo.nativeUri ? (
                     <video 
                       src={Capacitor.convertFileSrc(selectedVideo.nativeUri)}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-black"
                       controls
                       controlsList="nodownload"
                       disablePictureInPicture
                       preload="metadata"
+                      playsInline
+                      onLoadedData={(e) => { e.currentTarget.currentTime = 0.1; }}
+                      onError={() => {
+                        // Hide broken video and show fallback
+                        const el = document.getElementById(`vid-preview-${selectedVideo.id}`);
+                        if (el) el.style.display = 'none';
+                        const fb = document.getElementById(`vid-fallback-${selectedVideo.id}`);
+                        if (fb) fb.style.display = 'flex';
+                      }}
+                      id={`vid-preview-${selectedVideo.id}`}
                     />
-                  ) : (
-                    <div className="flex flex-col items-center text-slate-500 dark:text-slate-400">
-                      <Video className="w-8 h-8 mb-2 opacity-50" />
-                      <span className="text-xs font-semibold">Preview Unavailable</span>
+                  ) : null}
+                  <div
+                    id={`vid-fallback-${selectedVideo.id}`}
+                    className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400"
+                    style={{ display: selectedVideo.nativeUri ? 'none' : 'flex' }}
+                  >
+                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-2">
+                      <Play className="w-8 h-8 text-blue-400" />
                     </div>
-                  )}
+                    <span className="text-xs font-semibold">{selectedVideo.name}</span>
+                    <span className="text-[10px] text-slate-500 mt-1">Preview not available</span>
+                  </div>
                 </div>
 
                 {/* Active Video Info */}
@@ -256,9 +260,9 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                         onClick={async () => {
                           const success = await saveVideoToGallery(completedResult.downloadUrl!);
                           if (success) {
-                            alert('Video saved successfully to your Movies folder!');
+                            toast.success('Video saved successfully to your Movies folder!');
                           } else {
-                            alert('Failed to save video. Please try again.');
+                            toast.error('Failed to save video. Please try again.');
                           }
                         }}
                         className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg"

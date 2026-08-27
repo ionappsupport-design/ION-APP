@@ -16,11 +16,11 @@ export const IonLogo: React.FC<IonLogoProps> = ({
 }) => {
   const getDimensions = () => {
     switch (size) {
-      case 'xs': return { width: 110, height: 48, imgClass: 'h-8 max-w-[110px]' };
-      case 'sm': return { width: 160, height: 70, imgClass: 'h-11 max-w-[160px]' };
-      case 'md': return { width: 250, height: 110, imgClass: 'h-16 max-w-[250px]' };
-      case 'lg': return { width: 330, height: 145, imgClass: 'h-24 max-w-[330px]' };
-      case 'hero': return { width: 420, height: 185, imgClass: 'h-32 max-w-[420px]' };
+      case 'xs': return { width: 110, height: 48, imgClass: 'h-8 w-auto' };
+      case 'sm': return { width: 160, height: 70, imgClass: 'h-10 w-auto' };
+      case 'md': return { width: 250, height: 110, imgClass: 'h-14 w-auto' };
+      case 'lg': return { width: 330, height: 145, imgClass: 'h-20 w-auto' };
+      case 'hero': return { width: 420, height: 185, imgClass: 'h-28 w-auto' };
     }
   };
 

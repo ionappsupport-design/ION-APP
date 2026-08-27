@@ -35,11 +35,11 @@ export const ScanResultsScreen: React.FC<ScanResultsScreenProps> = ({
   const duplicateBytes = duplicateFiles.reduce((sum, f) => sum + f.size, 0);
   const duplicateCount = duplicateFiles.length;
 
-  const largeFiles = files.filter(f => f.category === 'large' || f.size > 50 * 1024 * 1024);
+  const largeFiles = files.filter(f => f.category === 'large' || f.size > 20 * 1024 * 1024);
   const largeBytes = largeFiles.reduce((sum, f) => sum + f.size, 0);
   const largeCount = largeFiles.length;
 
-  const screenshotFiles = files.filter(f => f.category === 'screenshot');
+  const screenshotFiles = files.filter(f => f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot') || f.path.toLowerCase().includes('screenshot'));
   const screenshotBytes = screenshotFiles.reduce((sum, f) => sum + f.size, 0);
   const screenshotCount = screenshotFiles.length;
 
@@ -47,7 +47,7 @@ export const ScanResultsScreen: React.FC<ScanResultsScreenProps> = ({
   const junkBytes = junkFiles.reduce((sum, f) => sum + f.size, 0);
   const junkCount = junkFiles.length;
 
-  const otherFiles = files.filter(f => !f.isDuplicate && !f.isJunk && f.category !== 'screenshot' && (f.category !== 'large' || f.size <= 50 * 1024 * 1024));
+  const otherFiles = files.filter(f => !f.isDuplicate && !f.isJunk && f.category !== 'screenshot' && !f.name.toLowerCase().includes('screenshot') && !f.path.toLowerCase().includes('screenshot') && (f.category !== 'large' && f.size <= 20 * 1024 * 1024));
   const otherBytes = otherFiles.reduce((sum, f) => sum + f.size, 0);
   const otherCount = otherFiles.length;
 

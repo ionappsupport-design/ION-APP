@@ -1,5 +1,6 @@
 import { ScannedFile, StorageOverview, JunkCategory, CleaningRecommendation } from '../types';
 import { getNativeStorageOverview } from './nativeStorageBridge';
+
 import { Capacitor } from '@capacitor/core';
 
 // Initial empty file array for native device filesystem scanning
@@ -135,7 +136,7 @@ export function detectJunkCategories(files: ScannedFile[]): JunkCategory[] {
   return categories;
 }
 
-export function generateSmartRecommendations(files: ScannedFile[]): CleaningRecommendation[] {
+export async function generateSmartRecommendations(files: ScannedFile[]): Promise<CleaningRecommendation[]> {
   const recommendations: CleaningRecommendation[] = [];
 
   // 1. Junk & Cache
@@ -171,7 +172,7 @@ export function generateSmartRecommendations(files: ScannedFile[]): CleaningReco
   }
 
   // 3. Old Screenshots
-  const oldScreenshots = files.filter(f => f.category === 'screenshot');
+  const oldScreenshots = files.filter(f => f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot') || f.path.toLowerCase().includes('screenshot'));
   if (oldScreenshots.length > 0) {
     const totalScBytes = oldScreenshots.reduce((sum, f) => sum + f.size, 0);
     recommendations.push({
@@ -186,19 +187,19 @@ export function generateSmartRecommendations(files: ScannedFile[]): CleaningReco
     });
   }
 
-  // 4. Large Video & Media Files
-  const largeFiles = files.filter(f => f.category === 'large' && f.size > 100 * 1024 * 1024);
+  // 4. Unused Large Files
+  const largeFiles = files.filter(f => f.category === 'large' || f.size > 20 * 1024 * 1024);
   if (largeFiles.length > 0) {
     const totalLargeBytes = largeFiles.reduce((sum, f) => sum + f.size, 0);
     recommendations.push({
       id: 'rec_large',
       title: 'Compress or Archive Large Videos',
-      description: `${largeFiles.length} large media files over 100 MB detected. Compress to reclaim up to 60% space.`,
+      description: `${largeFiles.length} large media files detected. Compress to reclaim up to 60% space.`,
       recoverableBytes: Math.round(totalLargeBytes * 0.5), // estimated 50% recovery via video compressor
       fileCount: largeFiles.length,
       type: 'large_files',
       files: largeFiles,
-      badgeColor: 'green',
+      badgeColor: 'purple',
     });
   }
 

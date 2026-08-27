@@ -35,7 +35,7 @@ export const RecycleBinScreen: React.FC<RecycleBinScreenProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
 
-  const totalBytes = items.reduce((sum, i) => sum + i.size, 0);
+  const totalBytes = items.reduce((sum, i) => sum + (i.size || 0), 0);
 
   const getIcon = (item: RecycleBinItem) => {
     switch (item.category) {
@@ -43,17 +43,24 @@ export const RecycleBinScreen: React.FC<RecycleBinScreenProps> = ({
       case 'screenshot':
       case 'video':
       case 'large':
-        if (item.fileData?.thumbnailUrl || item.fileData?.nativeUri) {
-          const src = item.fileData.thumbnailUrl || (item.fileData.nativeUri ? Capacitor.convertFileSrc(item.fileData.nativeUri) : '');
+        if (item.backupPath || item.fileData?.thumbnailUrl || item.fileData?.nativeUri) {
+          let src = '';
+          if (item.backupPath) {
+            // Must convert absolute file path to a web-view accessible URL
+            const validPath = item.backupPath.startsWith('file://') ? item.backupPath : `file://${item.backupPath}`;
+            src = Capacitor.convertFileSrc(validPath);
+          } else {
+            src = item.fileData?.thumbnailUrl ? Capacitor.convertFileSrc(item.fileData.thumbnailUrl) : (item.fileData?.nativeUri ? Capacitor.convertFileSrc(item.fileData.nativeUri) : '');
+          }
           
           if (item.mimeType?.startsWith('video/') || item.category === 'video' || (item.category === 'large' && item.mimeType?.startsWith('video/'))) {
-            if (item.fileData?.thumbnailUrl) {
-              return <img src={src} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />;
+            if (item.fileData?.thumbnailUrl && !item.backupPath) {
+              return <img src={src} alt={item.name} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />;
             }
             return (
               <video
                 src={src}
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 preload="metadata"
                 muted
                 playsInline
@@ -68,7 +75,7 @@ export const RecycleBinScreen: React.FC<RecycleBinScreenProps> = ({
             <img 
               src={src} 
               alt={item.name} 
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
             />
           );
         }
@@ -142,7 +149,7 @@ export const RecycleBinScreen: React.FC<RecycleBinScreenProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pb-24">
             {items.map((item) => (
               <motion.div
                 key={item.id}
@@ -157,7 +164,7 @@ export const RecycleBinScreen: React.FC<RecycleBinScreenProps> = ({
                   {getIcon(item)}
                   {/* File Size Badge */}
                   <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-md z-10">
-                    {formatBytes(item.size)}
+                    {formatBytes(item.size || 0)}
                   </div>
                 </div>
 

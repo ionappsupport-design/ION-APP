@@ -5,7 +5,9 @@ import {
   scanNativeStorage, 
   scanUserSelectedNativeFolder,
   executePhysicalDeletion, 
-  executeRealBackup 
+  executeRealBackup,
+  scanDocumentsNative,
+  runBlurDetectionBatch
 } from './services/nativeStorageBridge';
 import { Capacitor } from '@capacitor/core';
 import { 
@@ -14,9 +16,11 @@ import {
   StorageOverview, 
   DeviceSystemMetrics, 
   UserSettings,
-  RecycleBinItem
+  RecycleBinItem,
+  CleaningRecommendation
 } from './types';
 import { App as CapacitorApp } from '@capacitor/app';
+import { AdMob, BannerAdOptions, BannerAdSize, BannerAdPosition } from '@capacitor-community/admob';
 import { AndroidFrame } from './components/AndroidFrame';
 import { SplashScreen } from './components/SplashScreen';
 import { DashboardScreen } from './components/DashboardScreen';
@@ -36,7 +40,10 @@ import { SecurityPrivacyScreen } from './components/SecurityPrivacyScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { NoItemsFoundScreen } from './components/NoItemsFoundScreen';
 import { HelpSupportScreen } from './components/HelpSupportScreen';
+import { UpgradeProScreen } from './components/UpgradeProScreen';
 import { NavigationDrawer } from './components/NavigationDrawer';
+import { DevicePerformanceScreen } from './components/DevicePerformanceScreen';
+import { Toaster } from 'react-hot-toast';
 
 import { 
   INITIAL_DEVICE_FILES, 
@@ -45,9 +52,12 @@ import {
 } from './services/storageScanner';
 import { getRealDeviceSystemMetrics } from './services/systemMonitor';
 import { getNativeStorageOverview as getRealStorageOverviewBridge } from './services/nativeStorageBridge';
+import { getStoredProMembership } from './services/razorpayService';
+import { ProMembership } from './types';
 import { 
   getStoredNotifications, 
-  sendSmartNotification 
+  sendSmartNotification,
+  setupFCMAndScheduleNudge
 } from './services/notificationService';
 import { 
   loadRecycleBin, 
@@ -56,6 +66,7 @@ import {
   permanentlyDeleteFromBin, 
   clearEntireRecycleBin 
 } from './services/recycleBinManager';
+import { recordCleanEvent, getMonthlyStats } from './services/cleaningHistoryManager';
 
 const FILES_STORAGE_KEY = 'ion_device_scanned_files_v4';
 const SETTINGS_STORAGE_KEY = 'ion_user_settings_v3';
@@ -75,7 +86,7 @@ export default function App() {
   const [lastFreedCount, setLastFreedCount] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  // Handle Hardware Back Button
+  // Hardware Back Button Handler
   useEffect(() => {
     const backButtonListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
       if (currentTab === 'home' || currentTab === 'splash') {
@@ -87,8 +98,9 @@ export default function App() {
       } else if (currentTab === 'duplicate_group') {
         setCurrentTab('review_select');
       } else if (currentTab === 'category_detail') {
+        setSelectedSocialCategoryFiles(undefined);
         setCurrentTab(categoryDetailBackTab);
-      } else if (currentTab === 'storage_overview' || currentTab === 'settings' || currentTab === 'security' || currentTab === 'monthly_report' || currentTab === 'recycle_bin' || currentTab === 'video_compressor') {
+      } else if (currentTab === 'storage_overview' || currentTab === 'settings' || currentTab === 'security' || currentTab === 'monthly_report' || currentTab === 'recycle_bin' || currentTab === 'video_compressor' || currentTab === 'upgrade_pro' || currentTab === 'device_performance') {
         setCurrentTab('home');
       } else if (currentTab === 'clean_complete') {
         setCurrentTab('home');
@@ -106,7 +118,10 @@ export default function App() {
     return () => {
       backButtonListener.then(listener => listener.remove());
     };
-  }, [currentTab]);
+  }, [currentTab, categoryDetailBackTab]);
+
+  // Pro Membership State (Razorpay Entitlements)
+  const [membership, setMembership] = useState<ProMembership>(() => getStoredProMembership());
 
 
   // Recycle Bin State
@@ -118,11 +133,28 @@ export default function App() {
   const [files, setFiles] = useState<ScannedFile[]>(() => {
     try {
       const raw = localStorage.getItem(FILES_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : INITIAL_DEVICE_FILES;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed.map((f: any) => ({
+          ...f,
+          size: Number(f.size) || 0
+        }));
+      }
+      return INITIAL_DEVICE_FILES;
     } catch {
       return INITIAL_DEVICE_FILES;
     }
   });
+
+  const [recommendations, setRecommendations] = useState<CleaningRecommendation[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    generateSmartRecommendations(files).then(recs => {
+      if (isMounted) setRecommendations(recs);
+    });
+    return () => { isMounted = false; };
+  }, [files]);
 
   const [lastScanTime, setLastScanTime] = useState<number | null>(() => {
     const raw = localStorage.getItem(LAST_SCAN_KEY);
@@ -138,7 +170,7 @@ export default function App() {
       // Fallback
     }
     return {
-      theme: 'light',
+      theme: 'system',
       notificationsEnabled: true,
       lowStorageAlert: true,
       junkReminder: true,
@@ -173,29 +205,36 @@ export default function App() {
     batteryHealth: 'Good',
   });
 
-  // Sync theme changes to HTML document element
+  // Sync theme changes to HTML document element + Android status bar color
   useEffect(() => {
-    const applyTheme = () => {
-      if (settings.theme === 'dark') {
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
         document.documentElement.classList.add('dark');
-      } else if (settings.theme === 'light') {
-        document.documentElement.classList.remove('dark');
+        // Update Android status bar to dark
+        const meta = document.getElementById('theme-color-meta');
+        if (meta) meta.setAttribute('content', '#0f172a');
       } else {
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
+        document.documentElement.classList.remove('dark');
+        // Update Android status bar to light
+        const meta = document.getElementById('theme-color-meta');
+        if (meta) meta.setAttribute('content', '#f1f5f9');
       }
     };
 
-    applyTheme();
-
-    if (settings.theme === 'system' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = () => applyTheme();
-      mediaQuery.addEventListener('change', listener);
-      return () => mediaQuery.removeEventListener('change', listener);
+    if (settings.theme === 'dark') {
+      applyTheme(true);
+    } else if (settings.theme === 'light') {
+      applyTheme(false);
+    } else {
+      // system: follow OS
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(prefersDark);
+      if (window.matchMedia) {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const listener = (e: MediaQueryListEvent) => applyTheme(e.matches);
+        mediaQuery.addEventListener('change', listener);
+        return () => mediaQuery.removeEventListener('change', listener);
+      }
     }
   }, [settings.theme]);
 
@@ -208,7 +247,15 @@ export default function App() {
           setSystemMetrics(metrics);
         });
       }),
-      Promise.resolve()
+      (async () => {
+        try {
+          await AdMob.initialize({
+            initializeForTesting: false,
+          });
+        } catch (e) {
+          console.error("AdMob initialization failed", e);
+        }
+      })()
     ]).then(() => {
       setIsAppReady(true);
     }).catch((err) => {
@@ -216,6 +263,30 @@ export default function App() {
       setIsAppReady(true); // Ensure app still loads
     });
   }, []);
+
+  // AdMob Banner Logic
+  useEffect(() => {
+    const manageAdMob = async () => {
+      try {
+        if (membership.isPro || currentTab === 'splash' || currentTab === 'cleaning' || currentTab === 'upgrade_pro') {
+          await AdMob.hideBanner().catch(() => {});
+        } else {
+          await AdMob.showBanner({
+            adId: 'ca-app-pub-4120562777721944/7070570681', 
+            adSize: BannerAdSize.BANNER,
+            position: BannerAdPosition.BOTTOM_CENTER,
+            margin: 0,
+            isTesting: false 
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.error('AdMob Error', e);
+      }
+    };
+    if (isAppReady) {
+      manageAdMob();
+    }
+  }, [currentTab, membership.isPro, isAppReady]);
 
   // Sync files to storage
   const updateFiles = useCallback((newFiles: ScannedFile[]) => {
@@ -273,15 +344,13 @@ export default function App() {
     (async () => {
       try {
         // 1. Backup files into Recycle Bin first
-        for (const f of selectedFiles) {
-          try {
-            const backupRes = await executeRealBackup(f);
-            if (backupRes.success) {
-              addToRecycleBin(f, backupRes.backupPath);
-            }
-          } catch (e) {
-            console.error('Backup failed for', f.name, e);
+        try {
+          const backupRes = await executeRealBackup(selectedFiles);
+          for (const backup of backupRes.successfulBackups) {
+            addToRecycleBin(backup.file, backup.backupPath);
           }
+        } catch (e) {
+          console.error('Bulk backup failed', e);
         }
         setRecycleBinItems(loadRecycleBin());
 
@@ -292,8 +361,18 @@ export default function App() {
         const finalRemainingFiles = files.filter(f => !deletedIds.has(f.id));
         updateFiles(finalRemainingFiles);
 
-        setLastFreedBytes(deletionRes.freedBytes);
-        setLastFreedCount(deletionRes.deletedCount);
+        const freedBytes = deletionRes.freedBytes;
+        const freedCount = deletionRes.deletedCount;
+        setLastFreedBytes(freedBytes);
+        setLastFreedCount(freedCount);
+
+        // Record real cleaning event for Monthly Report
+        if (freedBytes > 0 || freedCount > 0) {
+          recordCleanEvent(freedBytes, freedCount);
+          
+          // Contextual notification permission for the 15-day lifetime premium nudge
+          setupFCMAndScheduleNudge(freedBytes);
+        }
       } catch (e) {
         console.error('Deletion operation failed', e);
       } finally {
@@ -397,42 +476,89 @@ export default function App() {
     if (isNativeAvailable) {
       setIsNativeScanning(true);
       setCurrentTab('scan');
-      const granted = await requestNativeStoragePermissions();
-      if (granted) {
-        try {
-          const { files: scannedFiles, metrics } = await scanNativeStorage();
-          updateFiles(scannedFiles);
-          const newOverview = await getRealStorageOverview(scannedFiles);
-          
-          if (metrics) {
-            newOverview.imageBytes = metrics.imageBytes;
-            newOverview.videoBytes = metrics.videoBytes;
-            newOverview.audioBytes = metrics.audioBytes;
-          }
-          
-          setStorageOverview(newOverview);
-        } catch (e) {
-          console.error("Native storage scan failed:", e);
+      // Request permissions but don't hard-block scan even if MANAGE_EXTERNAL_STORAGE is denied
+      const hasPerms = await requestNativeStoragePermissions();
+      if (!hasPerms) {
+        alert("Storage Permissions Required!\n\nPlease enable them in your phone's Settings -> Apps -> ION Cleaner -> Permissions, otherwise the scan will show 0 Bytes.");
+        setIsNativeScanning(false);
+        return;
+      }
+      try {
+        const [{ files: mediaFiles, metrics }, { files: socialFiles }, { files: junkFiles }, { files: docFiles }] = await Promise.all([
+          scanNativeStorage(),
+          import('./services/nativeStorageBridge').then(m => m.scanSocialMediaNative()),
+          import('./services/nativeStorageBridge').then(m => m.scanJunkFilesNative()),
+          scanDocumentsNative(),
+        ]);
+
+        // Combine files while avoiding duplicate paths
+        const existingPaths = new Set(mediaFiles.map(f => f.path));
+        const uniqueSocialFiles = socialFiles.filter(f => !existingPaths.has(f.path));
+        const uniqueJunkFiles = junkFiles.filter(f => !existingPaths.has(f.path) && !uniqueSocialFiles.some(sf => sf.path === f.path));
+        const uniqueDocFiles = docFiles.filter(f =>
+          !existingPaths.has(f.path) &&
+          !uniqueSocialFiles.some(sf => sf.path === f.path) &&
+          !uniqueJunkFiles.some(jf => jf.path === f.path)
+        );
+        
+        let allScannedFiles = [...mediaFiles, ...uniqueSocialFiles, ...uniqueJunkFiles, ...uniqueDocFiles];
+        
+        // Run blur detection on image files in background (non-blocking update)
+        runBlurDetectionBatch(allScannedFiles).then(filesWithBlur => {
+          updateFiles(filesWithBlur);
+        }).catch(() => {});
+
+        updateFiles(allScannedFiles);
+        
+        const newOverview = await getRealStorageOverview(allScannedFiles);
+        
+        if (metrics) {
+          newOverview.imageBytes = metrics.imageBytes;
+          newOverview.videoBytes = metrics.videoBytes;
+          newOverview.audioBytes = metrics.audioBytes;
+          newOverview.documentBytes = metrics.documentBytes;
         }
+        
+        setStorageOverview(newOverview);
+      } catch (e) {
+        console.error("Native storage scan failed:", e);
       }
       setIsNativeScanning(false);
     } else {
       setCurrentTab('scan');
     }
   };
-
-  const recommendations = generateSmartRecommendations(files);
   const unreadNotificationsCount = getStoredNotifications().filter(n => !n.read).length;
 
   return (
     <>
+      <Toaster 
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            background: '#1E293B',
+            color: '#fff',
+            borderRadius: '16px',
+            fontSize: '14px',
+            fontWeight: '600',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10B981',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <AndroidFrame
         currentTab={currentTab}
         onNavigate={(tab) => setCurrentTab(tab)}
-        
         unreadNotificationsCount={unreadNotificationsCount}
         batteryLevel={systemMetrics.batteryLevel}
         isCharging={systemMetrics.isCharging}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        isPro={membership.isPro}
       >
         {/* Screen 1: Splash */}
         {currentTab === 'splash' && (
@@ -450,9 +576,15 @@ export default function App() {
             recommendations={recommendations}
             systemMetrics={systemMetrics}
             onStartScan={handleStartFullScan}
-            onNavigate={(tab) => setCurrentTab(tab)}
+            onNavigate={(tab, payload) => {
+              if (tab === 'category_detail' && payload) {
+                setSelectedCategory(payload);
+                setCategoryDetailBackTab('home');
+              }
+              setCurrentTab(tab);
+            }}
             onOpenDrawer={() => setIsDrawerOpen(true)}
-            isPro={true}
+            isPro={membership.isPro}
           />
         )}
 
@@ -478,8 +610,9 @@ export default function App() {
             recommendations={recommendations}
             onCleanNow={() => {
               const junkFiles = files.filter(f => f.isJunk || f.category === 'junk' || f.category === 'temp' || f.category === 'cache');
-              const toClean = junkFiles.length > 0 ? junkFiles : files.slice(0, 10);
-              executeClean(toClean);
+              if (junkFiles.length > 0) {
+                executeClean(junkFiles);
+              }
             }}
             onReviewSelect={() => setCurrentTab('review_select')}
             onNavigate={(tab) => setCurrentTab(tab)}
@@ -512,8 +645,9 @@ export default function App() {
             onBack={() => setCurrentTab('review_select')}
             onKeepBest={() => {
               const duplicateCopies = files.filter(f => f.isDuplicate && !f.isOriginal);
-              const toClean = duplicateCopies.length > 0 ? duplicateCopies : files.slice(0, 1);
-              executeClean(toClean);
+              if (duplicateCopies.length > 0) {
+                executeClean(duplicateCopies);
+              }
             }}
           />
         )}
@@ -613,6 +747,7 @@ export default function App() {
           <MonthlyReportScreen
             onBack={() => setCurrentTab('home')}
             onNavigate={(tab) => setCurrentTab(tab)}
+            monthlyStats={getMonthlyStats(6)}
           />
         )}
 
@@ -628,6 +763,7 @@ export default function App() {
         {currentTab === 'settings' && (
           <SettingsScreen
             settings={settings}
+            membership={membership}
             onUpdateSettings={handleUpdateSettings}
             onBack={() => setCurrentTab('home')}
             onNavigate={(tab) => setCurrentTab(tab)}
@@ -649,17 +785,35 @@ export default function App() {
             onNavigate={(tab) => setCurrentTab(tab)}
           />
         )}
-        {/* Navigation Drawer Menu */}
-        <NavigationDrawer
-          isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
-          currentTab={currentTab}
-          onNavigate={(tab) => setCurrentTab(tab)}
-            
-            />
+
+        {/* Screen 19: Upgrade to Pro VIP (Razorpay Checkout) */}
+        {currentTab === 'upgrade_pro' && (
+          <UpgradeProScreen
+            currentMembership={membership}
+            onBack={() => setCurrentTab('home')}
+            onUpgradeSuccess={(newMembership) => setMembership(newMembership)}
+            onNavigate={(tab) => setCurrentTab(tab)}
+          />
+        )}
+
+        {/* Screen 20: Device Performance */}
+        {currentTab === 'device_performance' && (
+          <DevicePerformanceScreen
+            systemMetrics={systemMetrics}
+            onBack={() => setCurrentTab('home')}
+          />
+        )}
       </AndroidFrame>
-
-
+      <NavigationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        currentTab={currentTab}
+        isPro={membership.isPro}
+        onNavigate={(tab) => {
+          setCurrentTab(tab);
+          setIsDrawerOpen(false);
+        }}
+      />
     </>
   );
 }

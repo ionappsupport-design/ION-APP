@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ScannedFile, CleaningRecommendation, NavigationTab } from '../types';
 import { formatBytes } from '../utils/formatters';
+import { filterSelectedFiles } from '../utils/selectionUtils';
 
 interface ReviewSelectScreenProps {
   files: ScannedFile[];
@@ -41,11 +42,11 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
 
   // Selection states for each category
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({
-    duplicate: true,
-    large: true,
-    screenshot: true,
-    blurry: true,
-    other: true,
+    duplicate: false,
+    large: false,
+    screenshot: false,
+    blurry: false,
+    junk: false,
   });
 
   const toggleCategory = (cat: string) => {
@@ -61,7 +62,7 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
       large: true,
       screenshot: true,
       blurry: true,
-      other: true,
+      junk: true,
     });
   };
 
@@ -71,16 +72,16 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
       large: false,
       screenshot: false,
       blurry: false,
-      other: false,
+      junk: false,
     });
   };
 
   // Compute category statistics dynamically from scanned files
   const duplicateFiles = files.filter(f => f.isDuplicate && !f.isOriginal);
-  const largeFiles = files.filter(f => f.category === 'large' || f.size > 50 * 1024 * 1024);
+  const largeFiles = files.filter(f => f.category === 'large' || f.size > 20 * 1024 * 1024);
   const screenshotFiles = files.filter(f => f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot') || f.path.toLowerCase().includes('screenshot'));
   const blurryFiles = files.filter(f => f.isBlurry || f.category === 'blurry');
-  const otherFiles = files.filter(f => (f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp') && !f.isDuplicate && f.category !== 'screenshot' && f.category !== 'large' && !f.isBlurry);
+  const junkFiles = files.filter(f => f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp');
 
   const duplicateHashes = new Set(duplicateFiles.map(f => f.hash || f.name));
 
@@ -110,11 +111,11 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
       label: 'Blurry Photos',
       files: blurryFiles
     },
-    other: {
-      count: otherFiles.length,
-      size: otherFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Other Files',
-      files: otherFiles
+    junk: {
+      count: junkFiles.length,
+      size: junkFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+      label: 'Temporary & Cache Junk',
+      files: junkFiles
     },
   };
 
@@ -138,25 +139,17 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
     totalSelectedFiles += categoryStats.blurry.count;
     totalSelectedBytes += categoryStats.blurry.size;
   }
-  if (selectedCategories.other) {
-    totalSelectedFiles += categoryStats.other.count;
-    totalSelectedBytes += categoryStats.other.size;
+  if (selectedCategories.junk) {
+    totalSelectedFiles += categoryStats.junk.count;
+    totalSelectedBytes += categoryStats.junk.size;
   }
 
   const handleContinue = () => {
-    // Filter actual ScannedFile items based on selections
-    const selected = files.filter(f => {
-      if (selectedCategories.duplicate && f.isDuplicate && !f.isOriginal) return true;
-      if (selectedCategories.large && (f.category === 'large' || f.size > 50 * 1024 * 1024)) return true;
-      if (selectedCategories.screenshot && (f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot'))) return true;
-      if (selectedCategories.blurry && (f.isBlurry || f.category === 'blurry')) return true;
-      if (selectedCategories.other && (f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp')) return true;
-      return false;
-    });
+    const selected = filterSelectedFiles(files, selectedCategories);
 
     const cleanHandler = onContinueToBackup || onProceedToClean;
-    if (cleanHandler) {
-      cleanHandler(selected.length > 0 ? selected : files.slice(0, 10));
+    if (cleanHandler && selected.length > 0) {
+      cleanHandler(selected);
     }
   };
 
@@ -411,40 +404,41 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
             </div>
           )}
 
-          {/* Other Files */}
+          {/* Temporary & Cache Junk */}
           {(activeFilter === 'All' || activeFilter === 'Other') && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div 
-                className="flex items-center gap-3 flex-1 cursor-pointer"
-                onClick={() => onNavigateToCategory?.('other')}
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 sm:p-5 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400 flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    Other Files
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">
+                      {categoryStats.junk.label}
+                    </h3>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
                   </div>
-                  <div className="text-xs text-slate-400">
-                    {categoryStats.other.count} files
-                  </div>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                    {categoryStats.junk.count} files
+                  </p>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-black text-slate-900 dark:text-white">
-                  {formatBytes(categoryStats.other.size)}
+              <div className="flex items-center gap-4">
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {formatBytes(categoryStats.junk.size)}
                 </span>
-                <button
-                  onClick={() => toggleCategory('other')}
-                  className="text-blue-600 dark:text-cyan-400 p-1"
-                  aria-label="Toggle other files selection"
+                <button 
+                  onClick={() => toggleCategory('junk')}
+                  className="p-1.5 focus:outline-none"
                 >
-                  {selectedCategories.other ? (
-                    <CheckSquare className="w-5 h-5" />
+                  {selectedCategories.junk ? (
+                    <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
                   ) : (
-                    <Square className="w-5 h-5 text-slate-400" />
+                    <div className="w-6 h-6 rounded-md border-2 border-slate-300 dark:border-slate-600" />
                   )}
                 </button>
               </div>

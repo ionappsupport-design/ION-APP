@@ -7,7 +7,9 @@ import {
   Zap,
   CheckCircle2,
   Box,
-  Layers
+  Layers,
+  Crown,
+  ChevronRight
 } from 'lucide-react';
 import { StorageOverview, ScannedFile, CleaningRecommendation, NavigationTab, DeviceSystemMetrics } from '../types';
 import { formatBytes } from '../utils/formatters';
@@ -18,7 +20,7 @@ interface DashboardScreenProps {
   recommendations: CleaningRecommendation[];
   systemMetrics: DeviceSystemMetrics;
   onStartScan: () => void;
-  onNavigate: (tab: NavigationTab) => void;
+  onNavigate: (tab: NavigationTab, payload?: string) => void;
   onOpenDrawer: () => void;
   unreadNotificationsCount?: number;
   isPro?: boolean;
@@ -74,17 +76,38 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <IonLogo size="sm" showTagline={false} />
         </div>
 
-        {/* Notification Bell */}
-        <button
-          onClick={() => onNavigate('help_support')}
-          className="relative p-2.5 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-transform"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+        {/* Header Right Actions: Pro Status / Upgrade & Bell */}
+        <div className="flex items-center gap-2">
+          {isPro ? (
+            <button
+              onClick={() => onNavigate('upgrade_pro')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold"
+            >
+              <Crown className="w-3.5 h-3.5 fill-amber-400" />
+              <span>PRO VIP</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigate('upgrade_pro')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-transform"
+            >
+              <Crown className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+              <span>₹150 PRO</span>
+            </button>
           )}
-        </button>
+
+          {/* Notification Bell */}
+          <button
+            onClick={() => onNavigate('help_support')}
+            className="relative p-2.5 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-transform"
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+            )}
+          </button>
+        </div>
       </header>
 
       {/* Main Screen Content */}
@@ -190,7 +213,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         {/* 3 Quick Status Cards */}
         <div className="grid grid-cols-3 gap-3">
           {/* Memory Card */}
-          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm">
+          <button 
+            onClick={() => onNavigate('device_performance')}
+            className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm hover:border-blue-500/50 transition-colors"
+          >
             <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mb-1">
               Memory
             </div>
@@ -200,10 +226,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <div className="text-[10px] font-medium text-emerald-500 mt-0.5">
               {systemMetrics.ramTotalGb ? `of ${systemMetrics.ramTotalGb} GB` : 'RAM'}
             </div>
-          </div>
+          </button>
 
           {/* Battery Card */}
-          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm">
+          <button 
+            onClick={() => onNavigate('device_performance')}
+            className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-center shadow-sm hover:border-blue-500/50 transition-colors"
+          >
             <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mb-1">
               Battery
             </div>
@@ -213,7 +242,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <div className="text-[10px] font-medium text-cyan-500 mt-0.5">
               {systemMetrics.batteryHealth || 'Good'}
             </div>
-          </div>
+          </button>
 
           {/* System Info Card */}
           <button
@@ -231,6 +260,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </div>
           </button>
         </div>
+
+        {/* Upgrade to Pro Promo Banner (Shown when not Pro) */}
+        {!isPro && (
+          <div 
+            onClick={() => onNavigate('upgrade_pro')}
+            className="cursor-pointer bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30 rounded-3xl p-4 flex items-center justify-between shadow-sm hover:border-amber-500/50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                <Crown className="w-5 h-5 fill-amber-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                    Upgrade to ION Pro VIP
+                  </h4>
+                  <span className="text-[9px] font-extrabold bg-amber-400 text-slate-950 px-2 py-0.2 rounded-full uppercase">
+                    ₹150 Lifetime
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  7-Day Free Trial included • 100% Ad-Free • 70% Video Shrink
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        )}
 
         {/* Specialized Cleaning Tools Grid */}
         <div className="space-y-2">
@@ -274,6 +331,46 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </h4>
                 <p className="text-[10px] text-slate-400 mt-0.5">
                   Shrink videos safely
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate('category_detail', 'documents')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-left shadow-sm hover:border-amber-500/50 transition-all group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                  <Box className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950 px-2 py-0.5 rounded-full">Manager</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors">
+                  Document Cleaner
+                </h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  PDFs & large files
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate('category_detail', 'audio')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 text-left shadow-sm hover:border-emerald-500/50 transition-all group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">Manager</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 transition-colors">
+                  Audio Manager
+                </h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Music & recordings
                 </p>
               </div>
             </button>

@@ -8,7 +8,8 @@ import {
   Music,
   BarChart2,
   PieChart as PieChartIcon,
-  ChevronRight
+  ChevronRight,
+  HardDrive
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -60,7 +61,7 @@ export const StorageOverviewScreen: React.FC<StorageOverviewScreenProps> = ({
     .filter(f => f.category === 'video' || f.category === 'large')
     .reduce((sum, f) => sum + (f.size || 0), 0);
 
-  const docBytes = files
+  const docBytes = storageOverview.documentBytes ?? files
     .filter(f => f.category === 'document' || f.category === 'download')
     .reduce((sum, f) => sum + (f.size || 0), 0);
 
@@ -281,9 +282,20 @@ export const StorageOverviewScreen: React.FC<StorageOverviewScreenProps> = ({
 
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-2 border border-slate-200/80 dark:border-slate-800 shadow-sm divide-y divide-slate-100 dark:divide-slate-800/60">
             {files.length === 0 ? (
-              <div className="p-6 text-center">
-                <div className="text-sm font-bold text-slate-900 dark:text-white mb-1">No Data Available</div>
-                <div className="text-xs text-slate-500">Go to Home and tap "SCAN & CLEAN" to analyze your files.</div>
+              <div className="p-8 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                  <HardDrive className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                </div>
+                <div className="text-sm font-bold text-slate-900 dark:text-white mb-2">No Scan Data Available</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-6 max-w-[200px]">
+                  Run a full deep scan to view your storage breakdown and reclaim space.
+                </div>
+                <button
+                  onClick={() => onNavigate('dashboard')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-500/30 active:scale-95 transition-all text-sm w-full max-w-[200px]"
+                >
+                  Start Scan Now
+                </button>
               </div>
             ) : (
               <>

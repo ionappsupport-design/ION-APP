@@ -107,8 +107,8 @@ export const SocialCleanerScreen: React.FC<SocialCleanerScreenProps> = ({
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab
-                  ? 'bg-blue-600 text-slate-900 dark:text-white shadow-md'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
               }`}
             >
               {tab === 'all' ? 'All Apps' : tab}

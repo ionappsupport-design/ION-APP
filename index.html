@@ -2,17 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-    <meta name="description" content="An application built with Google AI Studio." />
-    <meta property="og:title" content="My Google AI Studio App" />
-    <meta property="og:description" content="An application built with Google AI Studio." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <!-- FIX: viewport-fit=cover for notch/punch-hole devices. user-scalable=no prevents zoom layout breaks on Samsung etc -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>ION Cleaner – Clean Storage &amp; Boost Speed</title>
+    <meta name="description" content="ION Cleaner - Native storage cleaning, recycle bin, video compressor and more." />
+    <!-- Android status bar color — updated by JS -->
+    <meta name="theme-color" id="theme-color-meta" content="#0f172a" />
+    <style>
+      /* FIX: Prevent system font scaling (Samsung Large font etc.) from breaking layout */
+      html {
+        font-size: 16px !important;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        min-height: 100dvh;
+        background: var(--app-bg, #0f172a);
+        overscroll-behavior: none;
+      }
+      html:not(.dark) {
+        --app-bg: #f1f5f9;
+      }
+      html.dark {
+        --app-bg: #0f172a;
+      }
+    </style>
+    <!-- FIX: Anti-FOUC — applies correct dark/light class BEFORE React mounts -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('ion_user_settings_v3');
+          var theme = 'system';
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            theme = parsed.theme || 'system';
+          }
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+              document.documentElement.classList.add('dark');
+            }
+          }
+        } catch(e) {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -48,6 +48,8 @@ export interface IonNativeStoragePluginInterface {
     videoOffset?: number;
     audioLimit?: number;
     audioOffset?: number;
+    documentLimit?: number;
+    documentOffset?: number;
   }): Promise<{
     files: ScannedFile[];
     count: number;
@@ -56,6 +58,7 @@ export interface IonNativeStoragePluginInterface {
     imageBytes: number;
     videoBytes: number;
     audioBytes: number;
+    documentBytes: number;
   }>;
   deleteMediaItems(options: { uris: string[] }): Promise<{
     deletedCount: number;
@@ -197,12 +200,30 @@ export async function requestNativeStoragePermissions(): Promise<boolean> {
     if (!Capacitor.isNativePlatform()) {
       return true;
     }
-    const res = await IonNativeStorage.requestStoragePermissions();
-    if (res.isTiramisu) {
-      const manageRes = await IonNativeStorage.requestManageExternalStorage();
-      return (res.granted || res.images || res.video || res.audio) && manageRes.granted;
+    const checkRes = await IonNativeStorage.checkStoragePermissions();
+    let permissionsGranted = checkRes.granted || checkRes.images || checkRes.video || checkRes.audio || false;
+    
+    if (!permissionsGranted) {
+       const res = await IonNativeStorage.requestStoragePermissions();
+       permissionsGranted = res.granted || res.images || res.video || res.audio || false;
     }
-    return res.granted || res.images || res.video || res.audio;
+
+    // MANAGE_EXTERNAL_STORAGE is critical for a cleaner app (access to Downloads, WhatsApp, Cache)
+    // On Android 11+ (API 30+), we MUST wait for the user to grant this in Settings.
+    try {
+      const manageRes = await IonNativeStorage.requestManageExternalStorage();
+      if (!manageRes.granted) {
+        console.error("Manage External Storage was denied by the user. Hard blocking scan.");
+        return false;
+      }
+      // If granted (or on Android 10 where it auto-resolves true), we have full access
+      permissionsGranted = true;
+    } catch (e) {
+      console.warn('Manage external storage request failed', e);
+      return false;
+    }
+
+    return permissionsGranted;
   } catch (error) {
     console.warn('Native storage permission request failed:', error);
     return false;
@@ -211,18 +232,19 @@ export async function requestNativeStoragePermissions(): Promise<boolean> {
 
 /**
  * Scan MediaStore on Android
+ * FIX: Screenshot tagging now happens AFTER large-file check to prevent override
  */
 export async function scanNativeStorage(): Promise<{
   files: ScannedFile[];
-  metrics: { imageBytes: number; videoBytes: number; audioBytes: number } | null;
+  metrics: { imageBytes: number; videoBytes: number; audioBytes: number; documentBytes: number } | null;
 }> {
   if (!Capacitor.isNativePlatform()) {
     return { files: [], metrics: null };
   }
 
   const allFiles: ScannedFile[] = [];
-  let metrics = { imageBytes: 0, videoBytes: 0, audioBytes: 0 };
-  let imgOffset = 0, vidOffset = 0, audOffset = 0;
+  let metrics = { imageBytes: 0, videoBytes: 0, audioBytes: 0, documentBytes: 0 };
+  let imgOffset = 0, vidOffset = 0, audOffset = 0, docOffset = 0;
   const CHUNK_SIZE = 500;
 
   try {
@@ -230,38 +252,38 @@ export async function scanNativeStorage(): Promise<{
       const mediaResult = await IonNativeStorage.scanMediaStore({
         imageLimit: CHUNK_SIZE, imageOffset: imgOffset,
         videoLimit: CHUNK_SIZE, videoOffset: vidOffset,
-        audioLimit: CHUNK_SIZE, audioOffset: audOffset
+        audioLimit: CHUNK_SIZE, audioOffset: audOffset,
+        documentLimit: CHUNK_SIZE, documentOffset: docOffset
       });
 
       if (!mediaResult || !mediaResult.files || mediaResult.files.length === 0) {
         break; // No more files
       }
 
-      metrics.imageBytes = mediaResult.imageBytes || metrics.imageBytes;
-      metrics.videoBytes = mediaResult.videoBytes || metrics.videoBytes;
-      metrics.audioBytes = mediaResult.audioBytes || metrics.audioBytes;
-      
-      let fetchedImgs = 0, fetchedVids = 0, fetchedAuds = 0;
+      let fetchedImgs = 0, fetchedVids = 0, fetchedAuds = 0, fetchedDocs = 0;
 
       for (const file of mediaResult.files) {
-        // Basic tagging
         let category = file.category;
         let isJunk = file.isJunk || false;
 
-        // Try to tag screenshots
-        if (file.path.toLowerCase().includes('screenshot')) {
-          category = 'screenshot';
-        }
-        
-        // Large files
+        // Ensure size is always a number (Capacitor can return strings for longs)
+        file.size = Number(file.size) || 0;
+
+        // FIX: Large file check FIRST (so screenshots >50MB still get large tag)
         if (file.size > 50 * 1024 * 1024) {
           category = 'large';
+        }
+
+        // FIX: Screenshot check AFTER large — only override if not already large
+        const lowPath = file.path.toLowerCase();
+        if (category !== 'large' && 
+            (lowPath.includes('screenshot') || lowPath.includes('screenshots'))) {
+          category = 'screenshot';
         }
 
         // Social Media Tagging
         let socialApp: 'WhatsApp' | 'Telegram' | 'Instagram' | undefined = undefined;
         let socialCategory: 'sent' | 'received' | 'status' | 'voice' | 'sticker' | 'database' | undefined = undefined;
-        const lowPath = file.path.toLowerCase();
 
         if (lowPath.includes('whatsapp')) {
           socialApp = 'WhatsApp';
@@ -273,7 +295,7 @@ export async function scanNativeStorage(): Promise<{
           else socialCategory = 'received';
         } else if (lowPath.includes('telegram')) {
           socialApp = 'Telegram';
-          socialCategory = 'received'; // Telegram doesn't strictly separate Sent like WhatsApp in media store usually
+          socialCategory = 'received';
         } else if (lowPath.includes('instagram')) {
           socialApp = 'Instagram';
           socialCategory = 'received';
@@ -292,14 +314,17 @@ export async function scanNativeStorage(): Promise<{
         if (file.mimeType.startsWith('image/')) fetchedImgs++;
         else if (file.mimeType.startsWith('video/')) fetchedVids++;
         else if (file.mimeType.startsWith('audio/')) fetchedAuds++;
+        else fetchedDocs++;
       }
 
-      // If we got 0 files total, the loop breaks above.
-      if (fetchedImgs === 0 && fetchedVids === 0 && fetchedAuds === 0) break;
+      if (fetchedImgs === 0 && fetchedVids === 0 && fetchedAuds === 0 && fetchedDocs === 0) break;
 
       imgOffset += fetchedImgs;
       vidOffset += fetchedVids;
       audOffset += fetchedAuds;
+      docOffset += fetchedDocs;
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
   } catch (err) {
     console.error('MediaStore chunked scan error:', err);
@@ -307,26 +332,39 @@ export async function scanNativeStorage(): Promise<{
 
   // Post-process to find duplicates
   try {
-    const duplicateGroups = groupDuplicateFiles(allFiles);
+    const duplicateGroups = await groupDuplicateFiles(allFiles);
     const duplicateIds = new Set<string>();
+    const originalIds = new Set<string>();
     
     for (const group of duplicateGroups) {
+      originalIds.add(group.original.id);
       for (const dup of group.duplicates) {
         duplicateIds.add(dup.id);
       }
     }
     
-    // Tag the duplicates in allFiles
     for (const f of allFiles) {
       if (duplicateIds.has(f.id)) {
         f.isDuplicate = true;
         f.isOriginal = false;
+      } else if (originalIds.has(f.id)) {
+        f.isDuplicate = true;
+        f.isOriginal = true;
       } else {
-        f.isDuplicate = false; 
+        f.isDuplicate = false;
       }
     }
   } catch(e) {
     console.warn("Duplicate post-processing failed:", e);
+  }
+
+  // Recalculate metrics precisely
+  metrics = { imageBytes: 0, videoBytes: 0, audioBytes: 0, documentBytes: 0 };
+  for (const f of allFiles) {
+    if (f.category === 'image' || f.category === 'screenshot') metrics.imageBytes += f.size;
+    else if (f.category === 'video' || f.category === 'large') metrics.videoBytes += f.size;
+    else if (f.category === 'document') metrics.documentBytes += f.size;
+    else if (f.category === 'audio') metrics.audioBytes += f.size;
   }
 
   return { files: allFiles, metrics };
@@ -351,7 +389,8 @@ export async function scanSocialMediaNative(): Promise<{ files: ScannedFile[] }>
       const res = await IonNativeStorage.scanSpecificFolder({ path });
       if (res && res.files) {
         for (const file of res.files) {
-          // Determine category
+          file.size = Number(file.size) || 0;
+          
           let category = 'document';
           if (file.mimeType.startsWith('image/')) category = 'image';
           else if (file.mimeType.startsWith('video/')) category = 'video';
@@ -383,9 +422,11 @@ export async function scanSocialMediaNative(): Promise<{ files: ScannedFile[] }>
             socialApp,
             socialCategory,
             source: 'native',
-            storageSource: 'mediastore', // treat as mediastore since it's just raw files
+            storageSource: 'mediastore',
             securityStatus: 'safe',
           });
+          
+          if (allFiles.length % 500 === 0) await new Promise(r => setTimeout(r, 0));
         }
       }
     }
@@ -394,6 +435,212 @@ export async function scanSocialMediaNative(): Promise<{ files: ScannedFile[] }>
   }
 
   return { files: allFiles };
+}
+
+/**
+ * FIX: Expanded junk scan — more folders + more extensions
+ * Now scans: Download, cache dirs, thumbnails, temp dirs, WhatsApp DBs
+ */
+export async function scanJunkFilesNative(): Promise<{ files: ScannedFile[] }> {
+  if (!Capacitor.isNativePlatform()) return { files: [] };
+
+  const junkFiles: ScannedFile[] = [];
+
+  // Extended junk file extensions
+  const JUNK_EXTENSIONS = new Set([
+    '.apk', '.tmp', '.temp', '.log', '.bak', '.old', '.orig',
+    '.crypt14', '.crypt15', '.crypt12',
+    '.part', '.crdownload', '.download',
+    '.dmp', '.crash', '.trace',
+    '.cache',
+  ]);
+
+  // Extended junk path patterns
+  const JUNK_PATH_PATTERNS = [
+    /\/cache\//i,
+    /\/\.cache\//i,
+    /\/thumbnails\//i,
+    /\/\.thumbnails\//i,
+    /\/temp\//i,
+    /\/tmp\//i,
+    /\.tmp$/i,
+    /\.log$/i,
+    /\.bak$/i,
+    /\.part$/i,
+    /\.crash$/i,
+  ];
+
+  const pathsToScan = [
+    'Download',
+    'Downloads',
+    'DCIM/.thumbnails',
+    '.thumbnails',
+    'Android/media/com.whatsapp/WhatsApp/Databases',
+    'WhatsApp/Databases',
+  ];
+
+  try {
+    for (const path of pathsToScan) {
+      try {
+        const res = await IonNativeStorage.scanSpecificFolder({ path });
+        if (res && res.files) {
+          for (const file of res.files) {
+            file.size = Number(file.size) || 0;
+            const lowName = file.name.toLowerCase();
+            const lowPath = file.path.toLowerCase();
+
+            const ext = '.' + lowName.split('.').pop();
+            const isJunkByExt = JUNK_EXTENSIONS.has(ext);
+            const isJunkByPath = JUNK_PATH_PATTERNS.some(r => r.test(lowPath));
+
+            if (isJunkByExt || isJunkByPath || file.isJunk) {
+              // Determine junk sub-type
+              let junkType: string = 'system_cache';
+              if (lowName.endsWith('.apk')) junkType = 'temp_file';
+              else if (lowName.endsWith('.log') || lowName.endsWith('.crash') || lowName.endsWith('.dmp')) junkType = 'obsolete_log';
+              else if (lowPath.includes('thumbnail')) junkType = 'thumbnail_cache';
+              else if (lowPath.includes('database') || lowName.includes('.crypt')) junkType = 'app_residual';
+
+              junkFiles.push({
+                ...file,
+                category: 'junk',
+                isJunk: true,
+                junkType: junkType as any,
+                source: 'native',
+                storageSource: 'mediastore',
+                securityStatus: 'safe',
+              });
+              
+              if (junkFiles.length % 500 === 0) await new Promise(r => setTimeout(r, 0));
+            }
+          }
+        }
+      } catch {
+        // Some paths may not exist on all devices — skip silently
+      }
+    }
+  } catch (e) {
+    console.error('Failed to scan junk files natively:', e);
+  }
+
+  return { files: junkFiles };
+}
+
+/**
+ * NEW: Scans Downloads and Documents folders for all file types (PDFs, ZIPs, DOCs, etc.)
+ * This is separate from junkScan — captures ALL document files, not just junk.
+ */
+export async function scanDocumentsNative(): Promise<{ files: ScannedFile[] }> {
+  if (!Capacitor.isNativePlatform()) return { files: [] };
+
+  const docFiles: ScannedFile[] = [];
+
+  const DOCUMENT_EXTENSIONS = new Set([
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.txt', '.csv', '.zip', '.rar', '.7z', '.tar', '.gz',
+    '.epub', '.mobi', '.odt', '.ods', '.odp',
+    '.json', '.xml', '.html', '.htm',
+  ]);
+
+  const pathsToScan = [
+    'Download',
+    'Downloads',
+    'Documents',
+  ];
+
+  try {
+    for (const path of pathsToScan) {
+      try {
+        const res = await IonNativeStorage.scanSpecificFolder({ path });
+        if (res && res.files) {
+          for (const file of res.files) {
+            file.size = Number(file.size) || 0;
+            if (file.size === 0) continue;
+
+            const lowName = file.name.toLowerCase();
+            const ext = '.' + lowName.split('.').pop();
+
+            // Skip files already tagged as junk
+            if (file.isJunk) continue;
+
+            // Determine category
+            let category: string = 'document';
+            if (file.mimeType?.startsWith('image/')) category = 'image';
+            else if (file.mimeType?.startsWith('video/')) category = 'video';
+            else if (file.mimeType?.startsWith('audio/')) category = 'audio';
+            else if (DOCUMENT_EXTENSIONS.has(ext)) category = 'document';
+            else if (!file.mimeType || file.mimeType === 'application/octet-stream') {
+              // Try to infer from extension
+              category = 'document';
+            }
+
+            docFiles.push({
+              ...file,
+              category: category as any,
+              source: 'native',
+              storageSource: 'mediastore',
+              securityStatus: 'safe',
+            });
+            
+            if (docFiles.length % 500 === 0) await new Promise(r => setTimeout(r, 0));
+          }
+        }
+      } catch {
+        // Path may not exist — skip silently
+      }
+    }
+  } catch (e) {
+    console.error('Failed to scan documents natively:', e);
+  }
+
+  return { files: docFiles };
+}
+
+/**
+ * NEW: Runs blur detection on image files in batches.
+ * Tags files with isBlurry: true if variance < blur threshold.
+ * Runs async after main scan — non-blocking.
+ */
+export async function runBlurDetectionBatch(
+  files: ScannedFile[],
+  onProgress?: (tagged: number, total: number) => void
+): Promise<ScannedFile[]> {
+  if (!Capacitor.isNativePlatform()) return files;
+
+  const BLUR_THRESHOLD = 100; // Laplacian variance — below this = blurry
+  const BATCH_SIZE = 50;
+  const MAX_FILES = 300; // Cap to avoid too-long processing
+
+  // Only process image files with nativeUri
+  const imageFiles = files
+    .filter(f => (f.category === 'image' || f.category === 'screenshot') && f.nativeUri)
+    .slice(0, MAX_FILES);
+
+  const updatedIds = new Map<string, boolean>(); // id -> isBlurry
+
+  for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
+    const batch = imageFiles.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (file) => {
+        try {
+          const res = await IonNativeStorage.getBlurScore({ uri: file.nativeUri! });
+          updatedIds.set(file.id, (res.variance ?? 999) < BLUR_THRESHOLD);
+        } catch {
+          // Ignore individual failures
+        }
+      })
+    );
+    onProgress?.(Math.min(i + BATCH_SIZE, imageFiles.length), imageFiles.length);
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  // Apply blur tags
+  return files.map(f => {
+    if (updatedIds.has(f.id)) {
+      return { ...f, isBlurry: updatedIds.get(f.id) };
+    }
+    return f;
+  });
 }
 
 /**
@@ -427,11 +674,12 @@ export async function scanUserSelectedNativeFolder(initialUri?: string): Promise
       });
       
       if (!scanResult || !scanResult.files || scanResult.files.length === 0) {
-        break; // No more files
+        break;
       }
 
       const chunkFiles = scanResult.files.map((f) => ({
         ...f,
+        size: Number(f.size) || 0,
         source: 'native' as const,
         storageSource: 'saf' as const,
         treeUri: pickResult.treeUri,
@@ -441,7 +689,7 @@ export async function scanUserSelectedNativeFolder(initialUri?: string): Promise
       safFiles.push(...chunkFiles);
 
       if (scanResult.files.length < CHUNK_SIZE) {
-        break; // Reached end of files
+        break;
       }
       
       offset += scanResult.files.length;
@@ -471,131 +719,91 @@ export async function scanUserSelectedNativeFolder(initialUri?: string): Promise
 export async function executePhysicalDeletion(filesToDelete: ScannedFile[]): Promise<{
   deletedCount: number;
   freedBytes: number;
+  failedCount: number;
   deletedFileIds: string[];
-  failedPaths: string[];
 }> {
+  if (!Capacitor.isNativePlatform()) {
+    return { deletedCount: 0, freedBytes: 0, failedCount: 0, deletedFileIds: [] };
+  }
+
   let deletedCount = 0;
   let freedBytes = 0;
+  let failedCount = 0;
   const deletedFileIds: string[] = [];
-  const failedPaths: string[] = [];
 
-  if (!Capacitor.isNativePlatform()) {
-    // Web Sandbox Mode: Honest local state removal
-    for (const f of filesToDelete) {
-      deletedCount++;
-      freedBytes += f.size;
-      deletedFileIds.push(f.id);
-    }
-    return { deletedCount, freedBytes, deletedFileIds, failedPaths };
-  }
+  // Separate MediaStore files (have nativeUri) vs SAF files (have documentUri)
+  const mediaStoreFiles = filesToDelete.filter(f => f.nativeUri && f.storageSource === 'mediastore');
+  const safFiles = filesToDelete.filter(f => f.documentUri && f.storageSource === 'saf');
 
-  // 1. Group MediaStore files (explicit storageSource === 'mediastore' or content:// or file:// nativeUri)
-  const mediaStoreFiles = filesToDelete.filter(
-    (f) => (f.storageSource === 'mediastore' || f.nativeUri?.startsWith('content://') || f.nativeUri?.startsWith('file://')) && f.nativeUri
-  );
-
+  // Delete MediaStore files in bulk
   if (mediaStoreFiles.length > 0) {
     try {
-      const uris = mediaStoreFiles.map((f) => f.nativeUri!);
-      const res = await IonNativeStorage.deleteMediaItems({ uris });
-      if (res.success && res.deletedCount > 0) {
-        // Confirmed deleted via MediaStore.createDeleteRequest or ContentResolver.delete
-        for (let i = 0; i < Math.min(res.deletedCount, mediaStoreFiles.length); i++) {
-          const file = mediaStoreFiles[i];
-          deletedCount++;
-          freedBytes += file.size;
-          deletedFileIds.push(file.id);
-        }
-      } else if (res.cancelled) {
-        failedPaths.push(...mediaStoreFiles.map((f) => f.path));
+      const uris = mediaStoreFiles.map(f => f.nativeUri!);
+      const result = await IonNativeStorage.deleteMediaItems({ uris });
+      if (!result.cancelled) {
+        deletedCount += result.deletedCount;
+        const successfullyDeletedFiles = mediaStoreFiles.slice(0, result.deletedCount);
+        freedBytes += successfullyDeletedFiles.reduce((sum, f) => sum + f.size, 0);
+        successfullyDeletedFiles.forEach(f => deletedFileIds.push(f.id));
       }
-    } catch (e: any) {
-      console.error('MediaStore physical deletion error:', e);
-      failedPaths.push(...mediaStoreFiles.map((f) => f.path));
+    } catch (e) {
+      console.error('MediaStore deletion failed:', e);
+      failedCount += mediaStoreFiles.length;
     }
   }
 
-  // 2. Group SAF (Storage Access Framework) files
-  const safFiles = filesToDelete.filter(
-    (f) => (f.storageSource === 'saf' || f.documentUri) && !mediaStoreFiles.includes(f)
-  );
-
-  for (const f of safFiles) {
-    if (!f.documentUri) continue;
+  // Delete SAF files one by one
+  for (const file of safFiles) {
     try {
-      const res = await IonNativeStorage.deleteSafDocument({ documentUri: f.documentUri });
-      if (res.success) {
+      const result = await IonNativeStorage.deleteSafDocument({ documentUri: file.documentUri! });
+      if (result.success) {
         deletedCount++;
-        freedBytes += f.size;
-        deletedFileIds.push(f.id);
+        freedBytes += file.size;
+        deletedFileIds.push(file.id);
       } else {
-        failedPaths.push(f.path);
+        failedCount++;
       }
-    } catch (err) {
-      failedPaths.push(f.path);
+    } catch {
+      failedCount++;
     }
   }
 
-  return { deletedCount, freedBytes, deletedFileIds, failedPaths };
+  return { deletedCount, freedBytes, failedCount, deletedFileIds };
 }
 
 /**
- * Real Local Backup of file before deletion
+ * Real file backup before deletion
  */
-export async function executeRealBackup(file: ScannedFile): Promise<{
-  success: boolean;
-  backupPath?: string;
-  bytesCopied?: number;
-  checksumSha256?: string;
-  error?: string;
+export async function executeRealBackup(filesToBackup: ScannedFile[]): Promise<{
+  successfulBackups: { file: ScannedFile; backupPath: string }[];
+  failedCount: number;
 }> {
   if (!Capacitor.isNativePlatform()) {
-    // In web browser, mark as backed up in memory/local store
-    return {
-      success: true,
-      backupPath: `web_backup://${file.name}`,
-      bytesCopied: file.size,
-      checksumSha256: 'web_sandbox_hash',
-    };
+    return { successfulBackups: [], failedCount: 0 };
   }
 
-  if (!file.nativeUri) {
-    return { success: false, error: 'No native URI present for file' };
+  const successfulBackups: { file: ScannedFile; backupPath: string }[] = [];
+  let failedCount = 0;
+
+  for (const file of filesToBackup) {
+    if (!file.nativeUri) {
+      failedCount++;
+      continue;
+    }
+    try {
+      const result = await IonNativeStorage.backupFile({
+        uri: file.nativeUri,
+        fileName: file.name,
+      });
+      if (result.success && result.backupPath) {
+        successfulBackups.push({ file, backupPath: result.backupPath });
+      } else {
+        failedCount++;
+      }
+    } catch {
+      failedCount++;
+    }
   }
 
-  try {
-    const res = await IonNativeStorage.backupFile({
-      uri: file.nativeUri,
-      fileName: file.name,
-    });
-    return res;
-  } catch (err: any) {
-    console.error('Real backup failed:', err);
-    return { success: false, error: err?.message || 'Backup failed' };
-  }
-}
-
-/**
- * REAL PHYSICAL FILE RESTORE:
- * Copies file from ion_backups directory back to Android Downloads folder
- */
-export async function executeRealPhysicalRestore(backupPath: string, originalName: string): Promise<{
-  success: boolean;
-  restoredPath?: string;
-  size?: number;
-  error?: string;
-}> {
-  if (!Capacitor.isNativePlatform()) {
-    return {
-      success: true,
-      restoredPath: `/Downloads/${originalName}`,
-    };
-  }
-  try {
-    const res = await IonNativeStorage.restoreFile({ backupPath, originalName });
-    return res;
-  } catch (err: any) {
-    console.error('Physical file restore failed:', err);
-    return { success: false, error: err?.message || 'File restore failed' };
-  }
+  return { successfulBackups, failedCount };
 }

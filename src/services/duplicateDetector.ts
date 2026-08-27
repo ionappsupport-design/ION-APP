@@ -49,45 +49,100 @@ export async function computeFileHash(fileOrBlob: Blob): Promise<string> {
 }
 
 /**
- * Groups files by hash and identifies original (oldest) vs duplicate copies
+ * Groups files by hash and identifies original (oldest) vs duplicate copies.
+ * FIX: Uses multi-strategy heuristic when native hash is unavailable:
+ *   1. Exact cryptographic hash (most reliable)
+ *   2. Exact name + size match (catches renamed copies in same folder)
+ *   3. Same size + same extension + lastModified within 60 seconds (catches camera duplicates)
  */
-export function groupDuplicateFiles(files: ScannedFile[]): DuplicateGroup[] {
+export async function groupDuplicateFiles(files: ScannedFile[]): Promise<DuplicateGroup[]> {
   const hashGroups = new Map<string, ScannedFile[]>();
 
-  files.forEach(file => {
-    if (file.hash) {
-      const existing = hashGroups.get(file.hash) || [];
-      existing.push(file);
-      hashGroups.set(file.hash, existing);
+  const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.gif', '.bmp']);
+  const MIN_SIZE_FOR_HEURISTIC = 50 * 1024; // 50 KB minimum to avoid false positives on tiny files
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file.size || file.size < MIN_SIZE_FOR_HEURISTIC) return;
+
+    let key: string;
+
+    if (file.hash && file.hash !== 'unknown_hash') {
+      // Strategy 1: Real cryptographic hash — most reliable
+      key = `hash_${file.hash}`;
+    } else {
+      const ext = file.name.toLowerCase().split('.').pop() || '';
+      const isImage = IMAGE_EXTENSIONS.has(`.${ext}`);
+
+      if (isImage && file.size > MIN_SIZE_FOR_HEURISTIC) {
+        // Strategy 2 for images: size + extension (bucket), then refine by lastModified proximity below
+        // Use size+ext as primary key — files with same size and same extension are candidates
+        key = `size_ext_${file.size}_${ext}`;
+      } else {
+        // Strategy 3: name + size (catches exact copies with same filename)
+        const cleanName = file.name.toLowerCase().replace(/\s*\(\d+\)\s*/g, '').replace(/\s*copy\s*/gi, '').trim();
+        key = `name_size_${cleanName}_${file.size}`;
+      }
     }
-  });
+
+    if (key) {
+      const existing = hashGroups.get(key) || [];
+      existing.push(file);
+      hashGroups.set(key, existing);
+    }
+    
+    if (i % 500 === 0) await new Promise(r => setTimeout(r, 0));
+  }
 
   const duplicateGroups: DuplicateGroup[] = [];
+  let iter = 0;
 
-  hashGroups.forEach((groupFiles, hash) => {
-    if (groupFiles.length > 1) {
-      // Sort by lastModified (oldest is considered original)
+  for (const [key, groupFiles] of hashGroups.entries()) {
+    let candidateGroups: ScannedFile[][] = [groupFiles];
+
+    // For size+ext buckets, sub-group by lastModified proximity (within 60 seconds)
+    if (key.startsWith('size_ext_') && groupFiles.length > 1) {
       const sorted = [...groupFiles].sort((a, b) => a.lastModified - b.lastModified);
+      const subGroups: ScannedFile[][] = [];
+      let current: ScannedFile[] = [sorted[0]];
+
+      for (let i = 1; i < sorted.length; i++) {
+        const timeDiff = Math.abs(sorted[i].lastModified - sorted[i - 1].lastModified);
+        if (timeDiff <= 60_000) { // within 60 seconds = likely duplicate burst
+          current.push(sorted[i]);
+        } else {
+          if (current.length > 1) subGroups.push(current);
+          current = [sorted[i]];
+        }
+      }
+      if (current.length > 1) subGroups.push(current);
+      candidateGroups = subGroups;
+    }
+
+    for (const group of candidateGroups) {
+      if (group.length < 2) continue;
+
+      // Sort by lastModified (oldest = original)
+      const sorted = [...group].sort((a, b) => a.lastModified - b.lastModified);
       const original = sorted[0];
       const duplicates = sorted.slice(1);
 
-      const fileSize = original.size;
-      const totalSize = fileSize * groupFiles.length;
-      const recoverableSize = fileSize * duplicates.length;
-
       duplicateGroups.push({
-        groupId: `group_${hash.substring(7, 15)}`,
-        hash,
+        groupId: `group_${original.id.substring(0, 8)}`,
+        hash: key,
         fileName: original.name,
-        fileSize,
-        totalSizeWithDuplicates: totalSize,
-        recoverableSize,
+        fileSize: original.size,
+        totalSizeWithDuplicates: original.size * group.length,
+        recoverableSize: original.size * duplicates.length,
         original,
         duplicates,
       });
     }
-  });
+    
+    if (iter++ % 100 === 0) await new Promise(r => setTimeout(r, 0));
+  }
 
   // Sort by recoverable storage descending
   return duplicateGroups.sort((a, b) => b.recoverableSize - a.recoverableSize);
 }
+

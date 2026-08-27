@@ -1,5 +1,17 @@
 import { RecycleBinItem, ScannedFile } from '../types';
-import { executeRealPhysicalRestore } from './nativeStorageBridge';
+import { registerPlugin } from '@capacitor/core';
+const IonNativeStorageRestore = registerPlugin<any>('IonNativeStorage');
+
+async function executeRealPhysicalRestore(backupPath: string, originalName: string): Promise<{
+  success: boolean; restoredPath?: string; size?: number; error?: string;
+}> {
+  try {
+    const res = await IonNativeStorageRestore.restoreFile({ backupPath, originalName });
+    return { success: res.success, restoredPath: res.restoredPath, size: res.size };
+  } catch (e: any) {
+    return { success: false, error: e?.message || 'Restore failed' };
+  }
+}
 
 const RECYCLE_BIN_KEY = 'ion_recycle_bin_items_v4';
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -108,8 +120,8 @@ export async function restoreItemFromRecycleBin(binId: string): Promise<{ succes
   return { success: true, restoredFile };
 }
 
-import { registerPlugin } from '@capacitor/core';
-const IonNativeStorage = registerPlugin<any>('IonNativeStorage');
+import { registerPlugin as _rp } from '@capacitor/core';
+const IonNativeStorage = _rp<any>('IonNativeStorage');
 
 export async function permanentlyDeleteFromBin(binId: string): Promise<boolean> {
   const items = loadRecycleBin();
