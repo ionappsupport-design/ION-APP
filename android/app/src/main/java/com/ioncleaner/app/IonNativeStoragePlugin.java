@@ -342,8 +342,8 @@ public class IonNativeStoragePlugin extends Plugin {
         try {
             Uri imageUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
             String[] projection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
-                new String[]{ MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.SIZE, MediaStore.Images.Media.MIME_TYPE, MediaStore.Images.Media.DATE_MODIFIED, MediaStore.Images.Media.RELATIVE_PATH } :
-                new String[]{ MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.SIZE, MediaStore.Images.Media.MIME_TYPE, MediaStore.Images.Media.DATE_MODIFIED };
+                new String[]{ MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.SIZE, MediaStore.Images.Media.MIME_TYPE, MediaStore.Images.Media.DATE_MODIFIED, MediaStore.Images.Media.RELATIVE_PATH, MediaStore.MediaColumns.DATA } :
+                new String[]{ MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.SIZE, MediaStore.Images.Media.MIME_TYPE, MediaStore.Images.Media.DATE_MODIFIED, MediaStore.MediaColumns.DATA };
 
             try (Cursor cursor = resolver.query(imageUri, projection, null, null, MediaStore.Images.Media.DATE_MODIFIED + " DESC")) {
                 if (cursor != null) {
@@ -359,10 +359,8 @@ public class IonNativeStoragePlugin extends Plugin {
                             long size = !cursor.isNull(sizeCol) ? Math.max(0, cursor.getLong(sizeCol)) : 0;
                             totalImageBytes += size;
                             totalBytes += size;
-                            
-                            
-                            
-                            
+                            if (imgCount >= imgLimit) break;
+                            imgCount++;
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("image_" + id);
@@ -384,7 +382,11 @@ public class IonNativeStoragePlugin extends Plugin {
                             fileObj.put("path", relPath != null && !relPath.isEmpty() ? relPath + name : name);
                             fileObj.put("source", "native");
                             fileObj.put("storageSource", "mediastore");
-                            fileObj.put("nativeUri", contentUri.toString());
+                            
+                            int dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                            String dataPath = (dataCol != -1 && !cursor.isNull(dataCol)) ? cursor.getString(dataCol) : null;
+                            String finalNativeUri = (dataPath != null && !dataPath.isEmpty()) ? "file://" + dataPath : contentUri.toString();
+                            fileObj.put("nativeUri", finalNativeUri);
                             fileObj.put("mediaStoreId", String.valueOf(id));
                             fileObj.put("category", isScreenshot ? "screenshot" : "image");
                             fileObj.put("mimeType", mimeType);
@@ -409,8 +411,8 @@ public class IonNativeStoragePlugin extends Plugin {
         try {
             Uri videoUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
             String[] projection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
-                new String[]{ MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE, MediaStore.Video.Media.MIME_TYPE, MediaStore.Video.Media.DATE_MODIFIED, MediaStore.Video.Media.RELATIVE_PATH } :
-                new String[]{ MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE, MediaStore.Video.Media.MIME_TYPE, MediaStore.Video.Media.DATE_MODIFIED };
+                new String[]{ MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE, MediaStore.Video.Media.MIME_TYPE, MediaStore.Video.Media.DATE_MODIFIED, MediaStore.Video.Media.RELATIVE_PATH, MediaStore.MediaColumns.DATA } :
+                new String[]{ MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE, MediaStore.Video.Media.MIME_TYPE, MediaStore.Video.Media.DATE_MODIFIED, MediaStore.MediaColumns.DATA };
 
             try (Cursor cursor = resolver.query(videoUri, projection, null, null, MediaStore.Video.Media.SIZE + " DESC")) { // Sort by size DESC
                 if (cursor != null) {
@@ -426,10 +428,8 @@ public class IonNativeStoragePlugin extends Plugin {
                             long size = !cursor.isNull(sizeCol) ? Math.max(0, cursor.getLong(sizeCol)) : 0;
                             totalVideoBytes += size;
                             totalBytes += size;
-                            
-                            
-                            
-                            
+                            if (vidCount >= vidLimit) break;
+                            vidCount++;
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("video_" + id);
@@ -450,7 +450,11 @@ public class IonNativeStoragePlugin extends Plugin {
                             fileObj.put("path", relPath != null && !relPath.isEmpty() ? relPath + name : name);
                             fileObj.put("source", "native");
                             fileObj.put("storageSource", "mediastore");
-                            fileObj.put("nativeUri", contentUri.toString());
+                            
+                            int dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                            String dataPath = (dataCol != -1 && !cursor.isNull(dataCol)) ? cursor.getString(dataCol) : null;
+                            String finalNativeUri = (dataPath != null && !dataPath.isEmpty()) ? "file://" + dataPath : contentUri.toString();
+                            fileObj.put("nativeUri", finalNativeUri);
                             fileObj.put("mediaStoreId", String.valueOf(id));
                             fileObj.put("category", isLarge ? "large" : "video");
                             fileObj.put("mimeType", mimeType);
@@ -475,8 +479,8 @@ public class IonNativeStoragePlugin extends Plugin {
         try {
             Uri audioUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
             String[] projection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
-                new String[]{ MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.DATE_MODIFIED, MediaStore.Audio.Media.RELATIVE_PATH } :
-                new String[]{ MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.DATE_MODIFIED };
+                new String[]{ MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.DATE_MODIFIED, MediaStore.Audio.Media.RELATIVE_PATH, MediaStore.MediaColumns.DATA } :
+                new String[]{ MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.DATE_MODIFIED, MediaStore.MediaColumns.DATA };
 
             try (Cursor cursor = resolver.query(audioUri, projection, null, null, MediaStore.Audio.Media.DATE_MODIFIED + " DESC")) {
                 if (cursor != null) {
@@ -492,10 +496,8 @@ public class IonNativeStoragePlugin extends Plugin {
                             long size = !cursor.isNull(sizeCol) ? Math.max(0, cursor.getLong(sizeCol)) : 0;
                             totalAudioBytes += size;
                             totalBytes += size;
-                            
-                            
-                            
-                            
+                            if (audCount >= audLimit) break;
+                            audCount++;
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("audio_" + id);
@@ -515,7 +517,11 @@ public class IonNativeStoragePlugin extends Plugin {
                             fileObj.put("path", relPath != null && !relPath.isEmpty() ? relPath + name : name);
                             fileObj.put("source", "native");
                             fileObj.put("storageSource", "mediastore");
-                            fileObj.put("nativeUri", contentUri.toString());
+                            
+                            int dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                            String dataPath = (dataCol != -1 && !cursor.isNull(dataCol)) ? cursor.getString(dataCol) : null;
+                            String finalNativeUri = (dataPath != null && !dataPath.isEmpty()) ? "file://" + dataPath : contentUri.toString();
+                            fileObj.put("nativeUri", finalNativeUri);
                             fileObj.put("mediaStoreId", String.valueOf(id));
                             fileObj.put("category", "audio");
                             fileObj.put("mimeType", mimeType);
@@ -540,8 +546,8 @@ public class IonNativeStoragePlugin extends Plugin {
         try {
             Uri filesUri = MediaStore.Files.getContentUri("external");
             String[] projection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
-                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.RELATIVE_PATH } :
-                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED };
+                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.DATA } :
+                new String[]{ MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.DATA };
 
             String selection = MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.pdf' OR " +
                                MediaStore.MediaColumns.DISPLAY_NAME + " LIKE '%.doc' OR " +
@@ -567,10 +573,8 @@ public class IonNativeStoragePlugin extends Plugin {
                             long size = !cursor.isNull(sizeCol) ? Math.max(0, cursor.getLong(sizeCol)) : 0;
                             totalDocumentBytes += size;
                             totalBytes += size;
-                            
-                            
-                            
-                            
+                            if (docCount >= docLimit) break;
+                            docCount++;
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("document_" + id);
@@ -583,6 +587,10 @@ public class IonNativeStoragePlugin extends Plugin {
 
                             Uri contentUri = ContentUris.withAppendedId(filesUri, id);
 
+                            int dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                            String dataPath = (dataCol != -1 && !cursor.isNull(dataCol)) ? cursor.getString(dataCol) : null;
+                            String finalNativeUri = (dataPath != null && !dataPath.isEmpty()) ? "file://" + dataPath : contentUri.toString();
+
                             JSObject fileObj = new JSObject();
                             fileObj.put("id", "mediastore_doc_" + id);
                             fileObj.put("name", name);
@@ -590,7 +598,7 @@ public class IonNativeStoragePlugin extends Plugin {
                             fileObj.put("path", relPath != null && !relPath.isEmpty() ? relPath + name : name);
                             fileObj.put("source", "native");
                             fileObj.put("storageSource", "mediastore");
-                            fileObj.put("nativeUri", contentUri.toString());
+                            fileObj.put("nativeUri", finalNativeUri);
                             fileObj.put("mediaStoreId", String.valueOf(id));
                             fileObj.put("category", "document");
                             fileObj.put("mimeType", mimeType);

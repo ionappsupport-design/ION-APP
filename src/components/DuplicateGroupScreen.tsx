@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { 
   ArrowLeft, 
   Search, 
@@ -6,7 +7,8 @@ import {
   CheckSquare, 
   Square,
   Sparkles,
-  Image as ImageIcon 
+  Image as ImageIcon,
+  Video as VideoIcon
 } from 'lucide-react';
 import { ScannedFile } from '../types';
 import { formatBytes } from '../utils';
@@ -124,8 +126,25 @@ export const DuplicateGroupScreen: React.FC<DuplicateGroupScreenProps> = ({
                       : 'border-slate-200 dark:border-slate-800'
                   }`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-500 to-sky-400 opacity-80" />
-                  <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[1px]" />
+                  {/* Media Preview Layer */}
+                  {file.category === 'video' || file.name.toLowerCase().match(/\.(mp4|mov|mkv|avi|webm)$/) ? (
+                    <video
+                      src={file.nativeUri ? Capacitor.convertFileSrc(file.nativeUri) : ''}
+                      className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+                      preload="metadata"
+                      muted
+                      playsInline
+                      onLoadedData={(e) => { e.currentTarget.currentTime = 0.1; }}
+                    />
+                  ) : (
+                    <img
+                      src={file.thumbnailUrl ? Capacitor.convertFileSrc(file.thumbnailUrl) : (file.nativeUri ? Capacitor.convertFileSrc(file.nativeUri) : '')}
+                      alt={file.name}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-slate-950/40 z-0 pointer-events-none" />
 
                   {/* Top Badge */}
                   <div className="relative z-10 flex items-center justify-between w-full">

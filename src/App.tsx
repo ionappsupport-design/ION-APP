@@ -624,6 +624,7 @@ export default function App() {
             files={files}
             storageOverview={storageOverview}
             onScanCompleted={handleScanCompleted}
+            onCancel={() => setCurrentTab('home')}
             onNavigateToReview={() => setCurrentTab('review_select')}
             onNavigateToJunk={() => setCurrentTab('scan_results')}
             onNavigateToDuplicates={() => setCurrentTab('duplicate_group')}
