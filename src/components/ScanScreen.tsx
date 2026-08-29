@@ -97,7 +97,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
-              filter="url(#scanRingGlow)"
             />
           </motion.svg>
         </div>

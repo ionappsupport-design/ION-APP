@@ -1,4 +1,5 @@
 import { PaymentPlan, ProMembership, RazorpaySuccessResponse, SupportedRegion, TrialState } from '../types';
+import { signInAnonymously, getCurrentUser, getIdToken } from './authService';
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
 const PRO_MEMBERSHIP_KEY = 'ion_pro_membership_v2';
@@ -393,7 +394,12 @@ function simulateRazorpaySandboxCheckout({
  * Retrieve saved Pro membership entitlement from storage
  * Checks paid membership FIRST, then 7-Day Free Trial status
  */
-export function getStoredProMembership(): ProMembership {
+export async function getStoredProMembership(): Promise<ProMembership> {
+  // --- SERVER AUTHORITATIVE FETCH ---
+  // In a full implementation, we would also query Firestore `users/${uid}` here
+  // to ensure the local storage hasn't been spoofed or to restore purchases.
+  // We keep the local storage check as the immediate response for offline capability.
+  
   // 1. Check paid membership
   try {
     const raw = safeGetItem(PRO_MEMBERSHIP_KEY);
@@ -453,10 +459,10 @@ export function getStoredProMembership(): ProMembership {
 /**
  * Save new Pro membership to storage (e.g. ₹150 Lifetime Purchase)
  */
-export function saveProMembership(
+export async function saveProMembership(
   plan: PaymentPlan,
   razorpayResponse: RazorpaySuccessResponse
-): ProMembership {
+): Promise<ProMembership> {
   const now = Date.now();
   let expiresAt: number | null = null;
 
@@ -468,6 +474,45 @@ export function saveProMembership(
     expiresAt = null; // No expiry, lifetime access
   }
 
+  // --- SERVER AUTHORITATIVE VERIFICATION ---
+  let user = await getCurrentUser();
+  if (!user) {
+    user = await signInAnonymously();
+  }
+  
+  if (!user) {
+    throw new Error("Authentication failed. Cannot verify payment without a user account.");
+  }
+
+  const token = await getIdToken();
+  const functionUrl = import.meta.env.VITE_VERIFY_PAYMENT_URL || 'https://your-project.vercel.app/api/verifyPayment';
+  
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      data: {
+        planId: plan.id,
+        paymentId: razorpayResponse.razorpay_payment_id,
+        orderId: razorpayResponse.razorpay_order_id,
+        signature: razorpayResponse.razorpay_signature,
+      }
+    })
+  });
+  
+  const json = await response.json();
+  if (!response.ok || (json.error && json.error.message)) {
+    console.error('Server verification failed:', json);
+    throw new Error(json.error?.message || "Payment verification failed or network is unreachable.");
+  }
+  // -----------------------------------------
+
+  // Only proceed to cache in localStorage AFTER server validation succeeds.
+  // We trust the server's response for the final membership object, but for now 
+  // we can reconstruct it identically to what the server stores to cache offline.
   const membership: ProMembership = {
     isPro: true,
     planId: plan.id,

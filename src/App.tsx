@@ -121,7 +121,18 @@ export default function App() {
   }, [currentTab, categoryDetailBackTab]);
 
   // Pro Membership State (Razorpay Entitlements)
-  const [membership, setMembership] = useState<ProMembership>(() => getStoredProMembership());
+  const [membership, setMembership] = useState<ProMembership>({
+    isPro: false,
+    planId: null,
+    planName: null,
+    status: 'free',
+    isTrial: false,
+    trialDaysLeft: 0,
+  });
+
+  useEffect(() => {
+    getStoredProMembership().then(mem => setMembership(mem));
+  }, []);
 
 
   // Recycle Bin State
@@ -249,11 +260,17 @@ export default function App() {
       }),
       (async () => {
         try {
+          if (Capacitor.getPlatform() !== 'web') {
+            const consentInfo = await AdMob.requestConsentInfo();
+            if (consentInfo.isConsentFormAvailable && consentInfo.status === 'REQUIRED') {
+              await AdMob.showConsentForm();
+            }
+          }
           await AdMob.initialize({
             initializeForTesting: false,
           });
         } catch (e) {
-          console.error("AdMob initialization failed", e);
+          console.error("AdMob initialization/consent failed", e);
         }
       })()
     ]).then(() => {
@@ -329,6 +346,7 @@ export default function App() {
 
   // Execute Clean operation with genuine physical deletion and 30-day Recycle Bin archiving
   const executeClean = async (selectedFiles: ScannedFile[]) => {
+    if (isDeleting) return;
     if (!selectedFiles || selectedFiles.length === 0) return;
 
     // Set isDeleting=true FIRST so CleaningScreen sees isBackendFinished=false from the start
@@ -491,15 +509,26 @@ export default function App() {
           scanDocumentsNative(),
         ]);
 
-        // Combine files while avoiding duplicate paths
+        // Combine files while avoiding duplicate paths efficiently (O(N) instead of O(N^2))
         const existingPaths = new Set(mediaFiles.map(f => f.path));
-        const uniqueSocialFiles = socialFiles.filter(f => !existingPaths.has(f.path));
-        const uniqueJunkFiles = junkFiles.filter(f => !existingPaths.has(f.path) && !uniqueSocialFiles.some(sf => sf.path === f.path));
-        const uniqueDocFiles = docFiles.filter(f =>
-          !existingPaths.has(f.path) &&
-          !uniqueSocialFiles.some(sf => sf.path === f.path) &&
-          !uniqueJunkFiles.some(jf => jf.path === f.path)
-        );
+        
+        const uniqueSocialFiles = socialFiles.filter(f => {
+          if (existingPaths.has(f.path)) return false;
+          existingPaths.add(f.path);
+          return true;
+        });
+
+        const uniqueJunkFiles = junkFiles.filter(f => {
+          if (existingPaths.has(f.path)) return false;
+          existingPaths.add(f.path);
+          return true;
+        });
+
+        const uniqueDocFiles = docFiles.filter(f => {
+          if (existingPaths.has(f.path)) return false;
+          existingPaths.add(f.path);
+          return true;
+        });
         
         let allScannedFiles = [...mediaFiles, ...uniqueSocialFiles, ...uniqueJunkFiles, ...uniqueDocFiles];
         

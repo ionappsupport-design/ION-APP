@@ -12,77 +12,54 @@ export const DEVELOPER_INFO = {
 
 export const PRIVACY_POLICY_DATA = {
   title: 'Privacy Policy',
-  effectiveDate: 'August 21, 2026',
+  effectiveDate: 'September 1, 2026',
   sections: [
     {
-      heading: '1. Information We Collect',
-      content: `Depending on the features you use, we may collect:
-
-- Name and basic profile information.
-- Email address.
-- Phone number, where required for authentication.
-- Login information provided through Google or other supported authentication services.
+      heading: 'Introduction',
+      content: `This Privacy Policy explains what information the ION app ("ION", "the App", "we", "us") collects, how it is used, who it is shared with, and the choices you have. It applies to the ION Android app and to ionapp.support-related web pages. This policy is written to match the Data Safety declaration ION submits to Google Play — if you ever notice a difference between what this page says and what the Play Store listing says, please contact us so we can fix it.`,
+    },
+    {
+      heading: '1. Our Core Data Principle: Your Files Stay on Your Device',
+      content: `ION is built as an offline-first app. When ION scans your photos, videos, documents, or audio files to find junk, duplicates, or large files, that scanning happens entirely on your device. The contents of your files are never uploaded, transmitted, or stored on our servers, and we cannot view them. The sections below explain the limited, non-file information that does leave your device, and why.`,
+    },
+    {
+      heading: '2. Information We Collect',
+      content: `We may collect non-file information such as:
+- Name and basic profile information (if you create an account).
+- Email address and login information (if you authenticate through supported services).
 - App usage and interaction data required to provide and improve the App.
-- Device information, operating system, app version, and technical information.
+- Device information, operating system, app version, and technical information for bug tracking.
 - Information you voluntarily submit through forms, feedback, or support requests.
 
-We only request permissions that are reasonably necessary for the App's functionality.`,
+We only request permissions that are reasonably necessary for the App's functionality, such as storage permissions to scan and clean files on your device.`,
     },
     {
-      heading: '2. How We Use Information',
-      content: `We may use collected information to:
-
-- Create and manage your account.
+      heading: '3. How We Use Information',
+      content: `We may use the limited collected information to:
+- Create and manage your account or premium subscription.
 - Authenticate users and maintain account security.
 - Provide and operate App features.
-- Personalize your experience.
-- Monitor and improve App performance.
+- Monitor and improve App performance and fix crashes.
 - Respond to support requests and feedback.
-- Detect, prevent, and address security issues, fraud, or misuse.
-- Comply with applicable legal obligations.`,
+- Detect, prevent, and address security issues, fraud, or misuse.`,
     },
     {
-      heading: '3. Information Sharing',
+      heading: '4. Information Sharing',
       content: `We do not sell your personal information.
 
-We may share information with trusted service providers that help us operate the App, such as authentication, hosting, analytics, cloud storage, or communication providers. These providers may process information only as necessary to provide their services.
+We may share information with trusted service providers that help us operate the App, such as authentication (Firebase Auth) or hosting. These providers may process information only as necessary to provide their services.
 
 We may also disclose information when required by applicable law, legal process, or to protect the rights, safety, and security of users or our services.`,
     },
     {
-      heading: '4. Data Security',
-      content: `We take reasonable technical and organizational measures to protect information against unauthorized access, alteration, disclosure, or destruction.
-
-However, no electronic transmission or storage system can be guaranteed to be completely secure.`,
+      heading: '5. Data Security',
+      content: `We take reasonable technical and organizational measures to protect information against unauthorized access, alteration, disclosure, or destruction. However, no electronic transmission or storage system can be guaranteed to be completely secure.`,
     },
     {
-      heading: '5. Data Retention',
-      content: `We retain information only for as long as reasonably necessary to provide our services, maintain legitimate business records, resolve disputes, enforce agreements, or comply with legal obligations.`,
-    },
-    {
-      heading: '6. Children\'s Privacy',
-      content: `The App is not intended to knowingly collect personal information from children in violation of applicable laws. If you believe that a child has provided personal information without appropriate consent, please contact us so that we can review and take appropriate action.`,
-    },
-    {
-      heading: '7. Third-Party Services',
-      content: `The App may use third-party services for authentication, hosting, analytics, notifications, or other functionality. These services may process information according to their own privacy policies.`,
-    },
-    {
-      heading: '8. Your Rights',
-      content: `Depending on applicable law, you may have rights to access, correct, delete, or otherwise control certain personal information.
-
-You may contact us to request assistance regarding your personal information or account.`,
-    },
-    {
-      heading: '9. Changes to This Privacy Policy',
-      content: `We may update this Privacy Policy from time to time. Any updated version will be made available through the App or our designated website. Continued use of the App after an update may constitute acceptance of the revised policy.`,
-    },
-    {
-      heading: '10. Contact Us',
+      heading: '6. Contact Us',
       content: `For privacy-related questions or requests, please contact:
 
-Email: alll.rounderone@gmail.com
-Developer: ${DEVELOPER_INFO.founder} & ${DEVELOPER_INFO.coDeveloper}
+Email: ionapp.support@gmail.com
 Phone: +91 7657026275
 Location: Bhubaneswar, Odisha, India`,
     },

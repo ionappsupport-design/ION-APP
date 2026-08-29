@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { formatBytes } from '../utils/formatters';
+
+vi.mock('@capacitor/device', () => ({
+  Device: {
+    getId: vi.fn().mockResolvedValue({ identifier: 'stable-test-device-id-1234' })
+  }
+}));
 import { categorizeSocialMedia } from '../services/socialCleaner';
 import { generateSmartRecommendations } from '../services/storageScanner';
 import { 
@@ -92,13 +98,14 @@ describe('Monetization: 7-Day Free Trial & ₹150 Lifetime Pricing', () => {
     clearProMembership();
   });
 
-  it('initializes and manages 7-Day Free Trial', () => {
+  it('initializes and manages 7-Day Free Trial', async () => {
     const trial = startFreeTrial();
     expect(trial.isTrialActive).toBe(true);
     expect(trial.remainingDays).toBe(7);
     expect(trial.billingStatus).toBe('trial');
 
-    const membership = getStoredProMembership();
+    // Assert Free Trial State
+    const membership = await getStoredProMembership();
     expect(membership.isPro).toBe(true);
     expect(membership.isTrial).toBe(true);
     expect(membership.trialDaysLeft).toBe(7);
@@ -140,21 +147,36 @@ describe('Monetization: 7-Day Free Trial & ₹150 Lifetime Pricing', () => {
     expect(lifetime?.currencySymbol).toBe('$');
   });
 
-  it('persists and retrieves Lifetime Pro membership upon successful ₹150 Razorpay payment', () => {
+  it('persists and retrieves Lifetime Pro membership upon successful ₹150 Razorpay payment', async () => {
     const lifetimePlan = PRO_PLANS.find(p => p.id === 'lifetime')!;
-    const mockRazorpayResponse = {
-      razorpay_payment_id: 'pay_test_150inr',
-      razorpay_order_id: 'order_test_150',
-      razorpay_signature: 'sig_test_150',
+    // 1. Simulate a successful ₹150 Razorpay payment
+    const paymentResponse = {
+      razorpay_payment_id: 'pay_ABC123',
+      razorpay_order_id: 'order_DEF456',
+      razorpay_signature: 'dummy_hash',
     };
+    
+    // Mock fetch for successful server validation
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true })
+    });
+    
+    // Mock getCurrentUser from authService
+    vi.mock('../services/authService', () => ({
+      getCurrentUser: vi.fn().mockResolvedValue({ uid: 'test_uid' }),
+      signInAnonymously: vi.fn().mockResolvedValue({ uid: 'test_uid' }),
+      getIdToken: vi.fn().mockResolvedValue('test_token'),
+    }));
 
-    const saved = saveProMembership(lifetimePlan, mockRazorpayResponse);
+    const saved = await saveProMembership(lifetimePlan, paymentResponse);
     expect(saved.isPro).toBe(true);
     expect(saved.planId).toBe('lifetime');
     expect(saved.amountPaid).toBe(150);
     expect(saved.isTrial).toBe(false);
 
-    const retrieved = getStoredProMembership();
+    // 2. Retrieve state
+    const retrieved = await getStoredProMembership();
     expect(retrieved.isPro).toBe(true);
     expect(retrieved.planId).toBe('lifetime');
     expect(retrieved.status).toBe('active');
@@ -162,10 +184,10 @@ describe('Monetization: 7-Day Free Trial & ₹150 Lifetime Pricing', () => {
 });
 
 describe('Legal & Policies Compliance', () => {
-  it('contains complete Privacy Policy dated August 21, 2026', () => {
-    expect(PRIVACY_POLICY_DATA.effectiveDate).toBe('August 21, 2026');
-    expect(PRIVACY_POLICY_DATA.sections.length).toBe(10);
-    expect(PRIVACY_POLICY_DATA.sections[0].heading).toContain('1. Information We Collect');
+  it('contains complete Privacy Policy dated September 1, 2026', () => {
+    expect(PRIVACY_POLICY_DATA.effectiveDate).toBe('September 1, 2026');
+    expect(PRIVACY_POLICY_DATA.sections.length).toBe(7);
+    expect(PRIVACY_POLICY_DATA.sections[0].heading).toContain('Introduction');
   });
 
   it('contains complete Terms of Use dated August 21, 2026', () => {

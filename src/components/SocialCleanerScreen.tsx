@@ -44,17 +44,20 @@ export const SocialCleanerScreen: React.FC<SocialCleanerScreenProps> = ({
     return () => { mounted = false; };
   }, []);
 
-  const combinedFiles = [...files, ...deepFiles];
-  // Deduplicate by ID just in case
-  const uniqueFiles = Array.from(new Map(combinedFiles.map(item => [item.id, item])).values());
+  const { categories, totalSocialBytes } = React.useMemo(() => {
+    const combinedFiles = [...files, ...deepFiles];
+    // Deduplicate by ID just in case
+    const uniqueFiles = Array.from(new Map(combinedFiles.map(item => [item.id, item])).values());
+    const cats = categorizeSocialMedia(uniqueFiles);
+    const bytes = cats.reduce((sum, c) => sum + c.sizeBytes, 0);
+    return { categories: cats, totalSocialBytes: bytes };
+  }, [files, deepFiles]);
 
-  const categories = categorizeSocialMedia(uniqueFiles);
-
-  const filteredCategories = activeTab === 'all'
-    ? categories
-    : categories.filter((c) => c.appName === activeTab);
-
-  const totalSocialBytes = categories.reduce((sum, c) => sum + c.sizeBytes, 0);
+  const filteredCategories = React.useMemo(() => {
+    return activeTab === 'all'
+      ? categories
+      : categories.filter((c) => c.appName === activeTab);
+  }, [categories, activeTab]);
 
   const handleScanDeepFolders = () => {
     if (!onScanFolder) return;
@@ -86,9 +89,9 @@ export const SocialCleanerScreen: React.FC<SocialCleanerScreenProps> = ({
 
       {/* Overview Banner */}
       <div className="p-4 space-y-3">
-        <div className="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 border border-emerald-500/20 rounded-3xl p-4 flex items-center justify-between shadow-lg">
+        <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/30 dark:to-blue-900/30 border border-emerald-500/20 rounded-3xl p-4 flex items-center justify-between shadow-lg">
           <div className="space-y-1">
-            <p className="text-xs text-slate-600 dark:text-slate-300">Social Media Junk Detected</p>
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Social Media Junk Detected</p>
             <h2 className="text-xl font-black text-slate-900 dark:text-white">
               {isScanning ? (
                 <span className="text-emerald-600 dark:text-emerald-400 text-sm animate-pulse">Scanning Deep Folders...</span>
@@ -100,7 +103,7 @@ export const SocialCleanerScreen: React.FC<SocialCleanerScreenProps> = ({
         </div>
 
         {/* Tab Filters */}
-        <div className="flex gap-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="flex gap-2 bg-slate-100 dark:bg-slate-950/60 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
           {(['all', 'WhatsApp', 'Telegram'] as const).map((tab) => (
             <button
               key={tab}
@@ -142,12 +145,12 @@ export const SocialCleanerScreen: React.FC<SocialCleanerScreenProps> = ({
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs font-bold text-slate-200">{formatBytes(cat.sizeBytes)}</p>
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-200">{formatBytes(cat.sizeBytes)}</p>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">{cat.count} files</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-slate-700/40">
+            <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-700/60 mt-3">
               <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{cat.path}</span>
               <button
                 disabled={cat.count === 0}

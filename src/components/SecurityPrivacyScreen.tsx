@@ -13,7 +13,9 @@ import {
   MapPin
 } from 'lucide-react';
 import { NavigationTab } from '../types';
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
+import { AdMob } from '@capacitor-community/admob';
+import toast from 'react-hot-toast';
 import { 
   PRIVACY_POLICY_DATA, 
   TERMS_OF_USE_DATA, 
@@ -210,6 +212,33 @@ export const SecurityPrivacyScreen: React.FC<SecurityPrivacyScreenProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Privacy Consent */}
+            {Capacitor.getPlatform() !== 'web' && (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Ad & Tracking Consent</h3>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await AdMob.showPrivacyOptionsForm();
+                        } catch (e) {
+                          console.error("Failed to show privacy options", e);
+                          toast.error("Consent form not available.");
+                        }
+                      }}
+                      className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Modify Consent
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Manage your GDPR/UMP privacy preferences for personalized tracking and advertising.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

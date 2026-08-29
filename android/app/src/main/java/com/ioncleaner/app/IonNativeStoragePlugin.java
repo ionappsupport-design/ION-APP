@@ -360,9 +360,9 @@ public class IonNativeStoragePlugin extends Plugin {
                             totalImageBytes += size;
                             totalBytes += size;
                             
-                            if (cursor.getPosition() < imgOffset) continue;
-                            if (imgCount >= imgLimit) break;
-                            imgCount++;
+                            
+                            
+                            
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("image_" + id);
@@ -394,7 +394,7 @@ public class IonNativeStoragePlugin extends Plugin {
 
                             filesArray.put(fileObj);
                         } catch (Throwable itemEx) {
-                            skippedCount++;
+                            
                         }
                     }
                 }
@@ -427,9 +427,9 @@ public class IonNativeStoragePlugin extends Plugin {
                             totalVideoBytes += size;
                             totalBytes += size;
                             
-                            if (cursor.getPosition() < vidOffset) continue;
-                            if (vidCount >= vidLimit) break;
-                            vidCount++;
+                            
+                            
+                            
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("video_" + id);
@@ -460,7 +460,7 @@ public class IonNativeStoragePlugin extends Plugin {
 
                             filesArray.put(fileObj);
                         } catch (Throwable itemEx) {
-                            skippedCount++;
+                            
                         }
                     }
                 }
@@ -493,9 +493,9 @@ public class IonNativeStoragePlugin extends Plugin {
                             totalAudioBytes += size;
                             totalBytes += size;
                             
-                            if (cursor.getPosition() < audOffset) continue;
-                            if (audCount >= audLimit) break;
-                            audCount++;
+                            
+                            
+                            
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("audio_" + id);
@@ -525,7 +525,7 @@ public class IonNativeStoragePlugin extends Plugin {
 
                             filesArray.put(fileObj);
                         } catch (Throwable itemEx) {
-                            skippedCount++;
+                            
                         }
                     }
                 }
@@ -568,9 +568,9 @@ public class IonNativeStoragePlugin extends Plugin {
                             totalDocumentBytes += size;
                             totalBytes += size;
                             
-                            if (cursor.getPosition() < docOffset) continue;
-                            if (docCount >= docLimit) break;
-                            docCount++;
+                            
+                            
+                            
 
                             long id = cursor.getLong(idCol);
                             String name = !cursor.isNull(nameCol) ? cursor.getString(nameCol) : ("document_" + id);
@@ -600,13 +600,13 @@ public class IonNativeStoragePlugin extends Plugin {
 
                             filesArray.put(fileObj);
                         } catch (Throwable itemEx) {
-                            skippedCount++;
+                            
                         }
                     }
                 }
             }
         } catch (Throwable e) {
-            skippedCount++;
+            
         }
 
         JSObject result = new JSObject();
@@ -1483,10 +1483,10 @@ public class IonNativeStoragePlugin extends Plugin {
                 for (Uri u : pendingDeleteUris) {
                     try (Cursor cursor = resolver.query(u, new String[]{MediaStore.MediaColumns._ID}, null, null, null)) {
                         if (cursor == null || !cursor.moveToFirst()) {
-                            deletedCount++;
+                            
                         }
                     } catch (Exception e) {
-                        deletedCount++;
+                        
                     }
                 }
             }

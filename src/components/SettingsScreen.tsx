@@ -10,6 +10,8 @@ import {
   Crown
 } from 'lucide-react';
 import { UserSettings, NavigationTab, ProMembership } from '../types';
+import { AdMob } from '@capacitor-community/admob';
+import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
 interface SettingsScreenProps {
@@ -251,6 +253,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </span>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
+
+            {/* Manage GDPR/UMP Consent */}
+            {Capacitor.getPlatform() !== 'web' && (
+              <button
+                onClick={async () => {
+                  try {
+                    await AdMob.showPrivacyOptionsForm();
+                  } catch (e) {
+                    console.error("Failed to show privacy options", e);
+                    toast.error("Consent form not available.");
+                  }
+                }}
+                className="w-full flex items-center justify-between p-3.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-2xl transition-colors"
+              >
+                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                  Privacy & Consent Options
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </button>
+            )}
           </div>
         </div>
 

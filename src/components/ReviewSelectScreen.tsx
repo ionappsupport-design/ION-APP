@@ -76,48 +76,50 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
     });
   };
 
-  // Compute category statistics dynamically from scanned files
-  const duplicateFiles = files.filter(f => f.isDuplicate && !f.isOriginal);
-  const largeFiles = files.filter(f => f.category === 'large' || f.size > 20 * 1024 * 1024);
-  const screenshotFiles = files.filter(f => f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot') || f.path.toLowerCase().includes('screenshot'));
-  const blurryFiles = files.filter(f => f.isBlurry || f.category === 'blurry');
-  const junkFiles = files.filter(f => f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp');
+  // Compute category statistics dynamically from scanned files only when files change
+  const categoryStats = React.useMemo(() => {
+    const duplicateFiles = files.filter(f => f.isDuplicate && !f.isOriginal);
+    const largeFiles = files.filter(f => f.category === 'large' || f.size > 20 * 1024 * 1024);
+    const screenshotFiles = files.filter(f => f.category === 'screenshot' || f.name.toLowerCase().includes('screenshot') || f.path.toLowerCase().includes('screenshot'));
+    const blurryFiles = files.filter(f => f.isBlurry || f.category === 'blurry');
+    const junkFiles = files.filter(f => f.isJunk || f.category === 'junk' || f.category === 'cache' || f.category === 'temp');
 
-  const duplicateHashes = new Set(duplicateFiles.map(f => f.hash || f.name));
+    const duplicateHashes = new Set(duplicateFiles.map(f => f.hash || f.name));
 
-  const categoryStats = {
-    duplicate: {
-      count: duplicateFiles.length,
-      groups: duplicateHashes.size > 0 ? duplicateHashes.size : Math.ceil(duplicateFiles.length / 2),
-      size: duplicateFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Duplicate Photos',
-      files: duplicateFiles
-    },
-    large: {
-      count: largeFiles.length,
-      size: largeFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Large Files',
-      files: largeFiles
-    },
-    screenshot: {
-      count: screenshotFiles.length,
-      size: screenshotFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Screenshots',
-      files: screenshotFiles
-    },
-    blurry: {
-      count: blurryFiles.length,
-      size: blurryFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Blurry Photos',
-      files: blurryFiles
-    },
-    junk: {
-      count: junkFiles.length,
-      size: junkFiles.reduce((sum, f) => sum + (f.size || 0), 0),
-      label: 'Temporary & Cache Junk',
-      files: junkFiles
-    },
-  };
+    return {
+      duplicate: {
+        count: duplicateFiles.length,
+        groups: duplicateHashes.size > 0 ? duplicateHashes.size : Math.ceil(duplicateFiles.length / 2),
+        size: duplicateFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        label: 'Duplicate Photos',
+        files: duplicateFiles
+      },
+      large: {
+        count: largeFiles.length,
+        size: largeFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        label: 'Large Files',
+        files: largeFiles
+      },
+      screenshot: {
+        count: screenshotFiles.length,
+        size: screenshotFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        label: 'Screenshots',
+        files: screenshotFiles
+      },
+      blurry: {
+        count: blurryFiles.length,
+        size: blurryFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        label: 'Blurry Photos',
+        files: blurryFiles
+      },
+      junk: {
+        count: junkFiles.length,
+        size: junkFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        label: 'Temporary & Cache Junk',
+        files: junkFiles
+      }
+    };
+  }, [files]);
 
   // Calculate totals for selected items
   let totalSelectedFiles = 0;
@@ -145,6 +147,8 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
   }
 
   const handleContinue = () => {
+    if (totalSelectedFiles === 0) return;
+
     const selected = filterSelectedFiles(files, selectedCategories);
 
     const cleanHandler = onContinueToBackup || onProceedToClean;
@@ -453,7 +457,7 @@ export const ReviewSelectScreen: React.FC<ReviewSelectScreenProps> = ({
           disabled={totalSelectedFiles === 0}
           className="w-full relative group overflow-hidden bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-50 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-cyan-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
         >
-          <span>CONTINUE</span>
+          <span>{totalSelectedFiles === 0 ? "0 Items Selected" : "CONTINUE"}</span>
         </button>
       </div>
     </div>

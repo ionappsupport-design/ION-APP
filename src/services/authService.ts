@@ -26,6 +26,34 @@ export async function signInWithGoogle(): Promise<UserProfile | null> {
   }
 }
 
+export async function signInAnonymously(): Promise<UserProfile | null> {
+  try {
+    const result = await FirebaseAuthentication.signInAnonymously();
+    if (result.user) {
+      return {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoUrl: result.user.photoUrl,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Anonymous Sign-In failed:', error);
+    throw error;
+  }
+}
+
+export async function getIdToken(): Promise<string | null> {
+  try {
+    const result = await FirebaseAuthentication.getIdToken();
+    return result.token;
+  } catch (error) {
+    console.warn('Failed to get ID token:', error);
+    return null;
+  }
+}
+
 export async function signOut(): Promise<void> {
   try {
     await FirebaseAuthentication.signOut();

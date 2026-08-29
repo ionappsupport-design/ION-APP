@@ -86,9 +86,9 @@ export const UpgradeProScreen: React.FC<UpgradeProScreenProps> = ({
           email: DEVELOPER_INFO.founderEmail,
           contact: DEVELOPER_INFO.phone,
         },
-        onSuccess: (res) => {
+        onSuccess: async (res) => {
           setIsProcessing(false);
-          const newMembership = saveProMembership(selectedPlan, res);
+          const newMembership = await saveProMembership(selectedPlan, res);
           onUpgradeSuccess(newMembership);
           setShowSuccessModal(true);
           triggerConfetti();
@@ -106,8 +106,8 @@ export const UpgradeProScreen: React.FC<UpgradeProScreenProps> = ({
     }
   };
 
-  const handleRestore = () => {
-    const mem = getStoredProMembership();
+  const handleRestore = async () => {
+    const mem = await getStoredProMembership();
     if (mem.isPro) {
       onUpgradeSuccess(mem);
       toast.success(`Restored ${mem.planName || 'Pro'} membership successfully!`);

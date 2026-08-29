@@ -10,6 +10,18 @@ service cloud.firestore {
       // Allow update, but block updating any trial or entitlement fields to prevent client-side cracking
       allow update: if request.auth != null && request.auth.uid == userId
                     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                      'isPro',
+                      'planId',
+                      'planName',
+                      'paymentId',
+                      'orderId',
+                      'purchasedAt',
+                      'expiresAt',
+                      'amountPaid',
+                      'currency',
+                      'status',
+                      'isTrial',
+                      'trialDaysLeft',
                       'isLifetimePro', 
                       'trialStatus', 
                       'trialExpiry', 

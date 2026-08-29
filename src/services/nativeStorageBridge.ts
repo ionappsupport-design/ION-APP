@@ -248,20 +248,9 @@ export async function scanNativeStorage(): Promise<{
   const CHUNK_SIZE = 500;
 
   try {
-    while (true) {
-      const mediaResult = await IonNativeStorage.scanMediaStore({
-        imageLimit: CHUNK_SIZE, imageOffset: imgOffset,
-        videoLimit: CHUNK_SIZE, videoOffset: vidOffset,
-        audioLimit: CHUNK_SIZE, audioOffset: audOffset,
-        documentLimit: CHUNK_SIZE, documentOffset: docOffset
-      });
+    const mediaResult = await IonNativeStorage.scanMediaStore();
 
-      if (!mediaResult || !mediaResult.files || mediaResult.files.length === 0) {
-        break; // No more files
-      }
-
-      let fetchedImgs = 0, fetchedVids = 0, fetchedAuds = 0, fetchedDocs = 0;
-
+    if (mediaResult && mediaResult.files && mediaResult.files.length > 0) {
       for (const file of mediaResult.files) {
         let category = file.category;
         let isJunk = file.isJunk || false;
@@ -311,20 +300,7 @@ export async function scanNativeStorage(): Promise<{
           storageSource: 'mediastore',
         });
         
-        if (file.mimeType.startsWith('image/')) fetchedImgs++;
-        else if (file.mimeType.startsWith('video/')) fetchedVids++;
-        else if (file.mimeType.startsWith('audio/')) fetchedAuds++;
-        else fetchedDocs++;
       }
-
-      if (fetchedImgs === 0 && fetchedVids === 0 && fetchedAuds === 0 && fetchedDocs === 0) break;
-
-      imgOffset += fetchedImgs;
-      vidOffset += fetchedVids;
-      audOffset += fetchedAuds;
-      docOffset += fetchedDocs;
-      
-      await new Promise(resolve => setTimeout(resolve, 0));
     }
   } catch (err) {
     console.error('MediaStore chunked scan error:', err);

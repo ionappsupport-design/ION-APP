@@ -39,8 +39,6 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
   const [userName, setUserName] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [ticketResult, setTicketResult] = useState<{ id: string; preview: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<'privacy' | 'terms' | 'refund' | null>(null);
@@ -71,21 +69,16 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
   const handleTicketSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userEmail || !message) return;
-    setIsSubmitting(true);
-    setError(null);
-
-    // Mock local ticket submission
-    setTimeout(() => {
-      const mockTicketId = 'TKT-' + Math.floor(1000 + Math.random() * 9000);
-      const preview = `To: ${userEmail}\nSubject: Re: ${subject || 'ION Support Request'}\n\nHi ${userName || 'User'},\n\nThank you for reaching out to ION Support. We have received your inquiry: "${message.substring(0, 80)}...". Our developer team will review your query and get back to you shortly.\n\nTicket Reference: ${mockTicketId}\nDeveloper: ${DEVELOPER_INFO.founder}\nEmail: ${DEVELOPER_INFO.founderEmail}\nStatus: OPEN`;
-      setTicketResult({
-        id: mockTicketId,
-        preview,
-      });
-      setMessage('');
-      setSubject('');
-      setIsSubmitting(false);
-    }, 800);
+    
+    const subjectText = encodeURIComponent(subject || 'ION Support Request');
+    const bodyText = encodeURIComponent(`Name: ${userName || 'User'}\nEmail: ${userEmail}\n\nMessage:\n${message}`);
+    
+    // Open default mail client
+    window.location.href = `mailto:${DEVELOPER_INFO.founderEmail}?subject=${subjectText}&body=${bodyText}`;
+    
+    // Clear form
+    setMessage('');
+    setSubject('');
   };
 
   return (
@@ -280,23 +273,6 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
               </div>
             )}
 
-            {ticketResult ? (
-              <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/40 rounded-2xl p-4 space-y-2 text-xs text-emerald-700 dark:text-emerald-300">
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                  <span>Ticket Logged: {ticketResult.id}</span>
-                </div>
-                <div className="p-3 bg-white dark:bg-slate-950/60 rounded-xl font-mono text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-line border border-emerald-100 dark:border-slate-800">
-                  {ticketResult.preview}
-                </div>
-                <button
-                  onClick={() => setTicketResult(null)}
-                  className="mt-2 text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:underline"
-                >
-                  Send another message
-                </button>
-              </div>
-            ) : (
               <form onSubmit={handleTicketSubmit} className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -347,14 +323,12 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+                  className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
                 >
                   <Send className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Submitting Ticket...' : 'Dispatch Ticket to Support'}</span>
+                  <span>Open Mail Client</span>
                 </button>
               </form>
-            )}
           </div>
         )}
       </main>

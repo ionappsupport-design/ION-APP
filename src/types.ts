@@ -149,12 +149,12 @@ export interface ProMembership {
   orderId?: string;
   signature?: string;
   purchasedAt?: number;
-  expiresAt?: number | null; // null for lifetime
+  expiresAt?: number | null;
   amountPaid?: number;
   currency?: string;
-  status: 'active' | 'expired' | 'free' | 'trial';
-  isTrial?: boolean;
-  trialDaysLeft?: number;
+  status: 'active' | 'expired' | 'cancelled' | 'free' | 'trial';
+  isTrial: boolean;
+  trialDaysLeft: number;
 }
 
 export interface RazorpaySuccessResponse {

@@ -63,7 +63,7 @@ export async function groupDuplicateFiles(files: ScannedFile[]): Promise<Duplica
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if (!file.size || file.size < MIN_SIZE_FOR_HEURISTIC) return;
+    if (!file.size || file.size < MIN_SIZE_FOR_HEURISTIC) continue;
 
     let key: string;
 
