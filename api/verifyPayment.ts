@@ -1,35 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 // ---------------------------------------------------------------------------
 // Firebase Admin initialisation (runs once per cold start)
 // ---------------------------------------------------------------------------
-if (!admin.apps.length) {
+if (!getApps().length) {
   const serviceAccount = JSON.parse(
     process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}'
   );
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  initializeApp({ credential: cert(serviceAccount) });
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
 // ---------------------------------------------------------------------------
-// Server-controlled pricing  (client cannot tamper with these values)
+// Server-controlled pricing (client cannot tamper with these values)
 // ---------------------------------------------------------------------------
 const PLANS: Record<string, { price: number; currency: string; name: string }> = {
-  monthly:  { price: 15,  currency: 'INR', name: 'Monthly Pro' },
-  annual:   { price: 99,  currency: 'INR', name: 'Annual Pro'  },
+  monthly:  { price: 15,  currency: 'INR', name: 'Monthly Pro'  },
+  annual:   { price: 99,  currency: 'INR', name: 'Annual Pro'   },
   lifetime: { price: 150, currency: 'INR', name: 'Lifetime Pro' },
 };
-
-// ---------------------------------------------------------------------------
-// Razorpay SDK (lazy, only used when real keys are provided)
-// ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Razorpay = require('razorpay');
 
 // ---------------------------------------------------------------------------
 // Helper — set CORS headers
@@ -67,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let uid: string;
 
   try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    const decoded = await getAuth().verifyIdToken(idToken);
     uid = decoded.uid;
   } catch {
     return res.status(401).json({ error: { message: 'Invalid or expired Firebase ID token.' } });
@@ -76,7 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // -------------------------------------------------------------------------
   // 2. Validate input fields
   // -------------------------------------------------------------------------
-  // Support both top-level and wrapped { data: {...} } formats
   const body = (req.body?.data ?? req.body) as {
     planId?: string;
     paymentId?: string;
@@ -99,9 +92,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 3. Server-side HMAC signature verification
   // -------------------------------------------------------------------------
   const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
-  const KEY_ID     = process.env.RAZORPAY_KEY_ID || '';
+  const KEY_ID     = process.env.RAZORPAY_KEY_ID     || '';
 
-  const payload          = `${orderId}|${paymentId}`;
+  const payload           = `${orderId}|${paymentId}`;
   const expectedSignature = crypto
     .createHmac('sha256', KEY_SECRET)
     .update(payload)
@@ -131,8 +124,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // -------------------------------------------------------------------------
   if (KEY_ID && KEY_ID !== 'test_key_id') {
     try {
-      const rzp     = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
-      const payment = await rzp.payments.fetch(paymentId);
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Razorpay = require('razorpay');
+      const rzp      = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
+      const payment  = await rzp.payments.fetch(paymentId);
 
       if (payment.status !== 'captured') {
         return res.status(402).json({ error: { message: `Payment not captured. Status: ${payment.status}` } });
@@ -157,9 +152,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // -------------------------------------------------------------------------
   const now = Date.now();
   const expiresAt =
-    planId === 'monthly' ? now + 30 * 24 * 60 * 60 * 1000
-    : planId === 'annual' ? now + 365 * 24 * 60 * 60 * 1000
-    : null; // lifetime
+    planId === 'monthly' ? now + 30  * 24 * 60 * 60 * 1000 :
+    planId === 'annual'  ? now + 365 * 24 * 60 * 60 * 1000 :
+    null; // lifetime
 
   const membership = {
     isPro: true,
@@ -174,12 +169,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     status: 'active',
     isTrial: false,
     trialDaysLeft: 0,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   try {
     const batch = db.batch();
-    batch.set(orderRef, { uid, planId, paymentId, processedAt: admin.firestore.FieldValue.serverTimestamp() });
+    batch.set(orderRef, {
+      uid,
+      planId,
+      paymentId,
+      processedAt: FieldValue.serverTimestamp(),
+    });
     batch.set(db.collection('users').doc(uid), membership, { merge: true });
     await batch.commit();
   } catch (err) {
