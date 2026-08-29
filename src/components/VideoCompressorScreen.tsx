@@ -120,8 +120,17 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                           : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600/30 to-purple-600/30 flex items-center justify-center shrink-0 overflow-hidden relative border border-blue-500/20">
-                        <Video className="w-5 h-5 text-blue-400" />
+                      <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden relative border border-blue-500/20">
+                        {vid.thumbnailUrl || vid.nativeUri ? (
+                          <img 
+                            src={Capacitor.convertFileSrc(vid.thumbnailUrl || vid.nativeUri)} 
+                            className="w-full h-full object-cover" 
+                            alt={vid.name} 
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Video className="w-5 h-5 text-blue-400" />
+                        )}
                       </div>
                       <div className="max-w-[120px]">
                         <p className="text-xs font-bold truncate">{vid.name}</p>
@@ -140,6 +149,7 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                 <div className="w-full aspect-[9/16] bg-slate-100 dark:bg-slate-800/60 rounded-2xl overflow-hidden shadow-inner relative flex items-center justify-center group mx-auto max-w-[280px]">
                   {selectedVideo.nativeUri ? (
                     <video 
+                      key={selectedVideo.id}
                       src={Capacitor.convertFileSrc(selectedVideo.nativeUri)}
                       className="w-full h-full object-contain bg-black"
                       controls
@@ -148,21 +158,13 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                       preload="metadata"
                       playsInline
                       onLoadedData={(e) => { e.currentTarget.currentTime = 0.1; }}
-                      onError={() => {
-                        // Hide broken video and show fallback
-                        const el = document.getElementById(`vid-preview-${selectedVideo.id}`);
-                        if (el) el.style.display = 'none';
-                        const fb = document.getElementById(`vid-fallback-${selectedVideo.id}`);
-                        if (fb) fb.style.display = 'flex';
-                      }}
                       id={`vid-preview-${selectedVideo.id}`}
                     />
-                  ) : null}
-                  <div
-                    id={`vid-fallback-${selectedVideo.id}`}
-                    className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400"
-                    style={{ display: selectedVideo.nativeUri ? 'none' : 'flex' }}
-                  >
+                  ) : (
+                    <div
+                      id={`vid-fallback-${selectedVideo.id}`}
+                      className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400"
+                    >
                     <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-2">
                       <Play className="w-8 h-8 text-blue-400" />
                     </div>
