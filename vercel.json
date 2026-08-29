@@ -1,14 +1,11 @@
 {
   "version": 2,
   "functions": {
-    "api/verifyPayment.cjs": {
-      "runtime": "nodejs20.x"
-    }
+    "api/verifyPayment.cjs": { "runtime": "nodejs20.x" },
+    "api/health.cjs": { "runtime": "nodejs20.x" }
   },
   "routes": [
-    {
-      "src": "/api/verifyPayment",
-      "dest": "/api/verifyPayment.cjs"
-    }
+    { "src": "/api/health", "dest": "/api/health.cjs" },
+    { "src": "/api/verifyPayment", "dest": "/api/verifyPayment.cjs" }
   ]
 }
