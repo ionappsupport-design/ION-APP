@@ -244,28 +244,31 @@ export async function scanNativeStorage(): Promise<{
 
   const allFiles: ScannedFile[] = [];
   let metrics = { imageBytes: 0, videoBytes: 0, audioBytes: 0, documentBytes: 0 };
-  let imgOffset = 0, vidOffset = 0, audOffset = 0, docOffset = 0;
-  const CHUNK_SIZE = 500;
 
   try {
-    const mediaResult = await IonNativeStorage.scanMediaStore();
+    // SPEED FIX: Limit file counts so scan completes in <3s
+    const mediaResult = await IonNativeStorage.scanMediaStore({
+      imageLimit: 300,
+      videoLimit: 100,
+      audioLimit: 100,
+      documentLimit: 200,
+    });
 
     if (mediaResult && mediaResult.files && mediaResult.files.length > 0) {
       for (const file of mediaResult.files) {
         let category = file.category;
         let isJunk = file.isJunk || false;
 
-        // Ensure size is always a number (Capacitor can return strings for longs)
         file.size = Number(file.size) || 0;
 
-        // FIX: Large file check FIRST (so screenshots >50MB still get large tag)
+        // Large file check FIRST
         if (file.size > 50 * 1024 * 1024) {
           category = 'large';
         }
 
-        // FIX: Screenshot check AFTER large — only override if not already large
         const lowPath = file.path.toLowerCase();
-        if (category !== 'large' && 
+        // Screenshot check AFTER large
+        if (category !== 'large' &&
             (lowPath.includes('screenshot') || lowPath.includes('screenshots'))) {
           category = 'screenshot';
         }
@@ -299,42 +302,29 @@ export async function scanNativeStorage(): Promise<{
           source: 'native',
           storageSource: 'mediastore',
         });
-        
       }
     }
   } catch (err) {
-    console.error('MediaStore chunked scan error:', err);
+    console.error('MediaStore scan error:', err);
   }
 
-  // Post-process to find duplicates
-  try {
-    const duplicateGroups = await groupDuplicateFiles(allFiles);
+  // SPEED FIX: Run duplicate detection in background — don't block scan return
+  // Caller (App.tsx) will call updateFiles() again when duplicates are ready.
+  groupDuplicateFiles(allFiles).then(duplicateGroups => {
     const duplicateIds = new Set<string>();
     const originalIds = new Set<string>();
-    
     for (const group of duplicateGroups) {
       originalIds.add(group.original.id);
-      for (const dup of group.duplicates) {
-        duplicateIds.add(dup.id);
-      }
+      for (const dup of group.duplicates) duplicateIds.add(dup.id);
     }
-    
     for (const f of allFiles) {
-      if (duplicateIds.has(f.id)) {
-        f.isDuplicate = true;
-        f.isOriginal = false;
-      } else if (originalIds.has(f.id)) {
-        f.isDuplicate = true;
-        f.isOriginal = true;
-      } else {
-        f.isDuplicate = false;
-      }
+      if (duplicateIds.has(f.id)) { f.isDuplicate = true; f.isOriginal = false; }
+      else if (originalIds.has(f.id)) { f.isDuplicate = true; f.isOriginal = true; }
+      else { f.isDuplicate = false; }
     }
-  } catch(e) {
-    console.warn("Duplicate post-processing failed:", e);
-  }
+  }).catch(() => {});
 
-  // Recalculate metrics precisely
+  // Metrics — calculated immediately from current files
   metrics = { imageBytes: 0, videoBytes: 0, audioBytes: 0, documentBytes: 0 };
   for (const f of allFiles) {
     if (f.category === 'image' || f.category === 'screenshot') metrics.imageBytes += f.size;
@@ -522,6 +512,9 @@ export async function scanDocumentsNative(): Promise<{ files: ScannedFile[] }> {
     'Download',
     'Downloads',
     'Documents',
+    'DCIM/Documents',
+    'Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents',
+    'Telegram/Telegram Documents',
   ];
 
   try {

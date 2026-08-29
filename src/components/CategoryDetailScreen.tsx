@@ -55,7 +55,8 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
         return f.category === 'video' || f.name.toLowerCase().match(/\.(mp4|mov|mkv|avi|webm)$/);
       }
       if (category === 'documents') {
-        return f.category === 'document' || f.name.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|txt|zip|rar)$/);
+        return f.category === 'document'
+          || f.name.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|7z|tar|gz|apk|epub|json|xml|html|htm|odt|ods)$/) != null;
       }
       if (category === 'audio') {
         return f.category === 'audio' || f.name.toLowerCase().match(/\.(mp3|wav|m4a|flac|aac)$/);
@@ -274,10 +275,14 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {categoryFiles.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-            <AlertCircle className="w-16 h-16 mb-4 text-slate-400" />
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-70">
+            <AlertCircle className="w-14 h-14 mb-4 text-slate-400" />
             <h2 className="text-xl font-bold mb-2">No files found</h2>
-            <p className="text-sm">We couldn't find any {category} on your device.</p>
+            <p className="text-sm text-slate-500 max-w-xs">
+              {category === 'documents'
+                ? 'No documents found. Files in your Downloads, Documents folder or APKs will appear here after scanning.'
+                : `We couldn't find any ${category} files on your device.`}
+            </p>
           </div>
         ) : isGridView ? (
           <VirtuosoGrid

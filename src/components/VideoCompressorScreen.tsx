@@ -136,38 +136,33 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
             {selectedVideo && (
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-sm">
                 
-                {/* Video Preview */}
-                <div className="w-full aspect-[9/16] bg-slate-100 dark:bg-slate-800/60 rounded-2xl overflow-hidden shadow-inner relative flex items-center justify-center group mx-auto max-w-[280px]">
-                  {selectedVideo.nativeUri ? (
-                    <video 
+                {/* Video Preview — thumbnail-first, no broken <video> element */}
+                <div className="w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner relative flex items-center justify-center mx-auto">
+                  {/* Thumbnail image (most reliable on Android WebView) */}
+                  {selectedVideo.thumbnailUrl ? (
+                    <img
+                      src={Capacitor.convertFileSrc(selectedVideo.thumbnailUrl)}
+                      alt={selectedVideo.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : selectedVideo.nativeUri ? (
+                    <img
                       src={Capacitor.convertFileSrc(selectedVideo.nativeUri)}
-                      className="w-full h-full object-contain bg-black"
-                      controls
-                      controlsList="nodownload"
-                      disablePictureInPicture
-                      preload="metadata"
-                      playsInline
-                      onLoadedData={(e) => { e.currentTarget.currentTime = 0.1; }}
-                      onError={() => {
-                        // Hide broken video and show fallback
-                        const el = document.getElementById(`vid-preview-${selectedVideo.id}`);
-                        if (el) el.style.display = 'none';
-                        const fb = document.getElementById(`vid-fallback-${selectedVideo.id}`);
-                        if (fb) fb.style.display = 'flex';
-                      }}
-                      id={`vid-preview-${selectedVideo.id}`}
+                      alt={selectedVideo.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   ) : null}
-                  <div
-                    id={`vid-fallback-${selectedVideo.id}`}
-                    className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400"
-                    style={{ display: selectedVideo.nativeUri ? 'none' : 'flex' }}
-                  >
-                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-2">
-                      <Play className="w-8 h-8 text-blue-400" />
+                  {/* Overlay with play icon — always visible so user knows it's a video */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-3 shadow-lg">
+                      <Play className="w-8 h-8 text-white ml-1" fill="white" />
                     </div>
-                    <span className="text-xs font-semibold">{selectedVideo.name}</span>
-                    <span className="text-[10px] text-slate-500 mt-1">Preview not available</span>
+                    <span className="text-xs font-bold text-white/90 max-w-[200px] truncate px-2 text-center">
+                      {selectedVideo.name}
+                    </span>
+                    <span className="text-[11px] text-white/60 mt-1">{formatBytes(selectedVideo.size)}</span>
                   </div>
                 </div>
 
