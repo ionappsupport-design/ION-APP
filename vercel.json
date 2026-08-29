@@ -1,3 +1,14 @@
 {
-  "version": 2
+  "version": 2,
+  "functions": {
+    "api/verifyPayment.cjs": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/verifyPayment",
+      "dest": "/api/verifyPayment.cjs"
+    }
+  ]
 }
