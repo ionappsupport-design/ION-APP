@@ -1,35 +1,42 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const crypto = require('crypto');
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { getAuth } = require('firebase-admin/auth');
-const Razorpay = require('razorpay');
 
-// ---------------------------------------------------------------------------
-// Firebase Admin initialisation (once per cold start)
-// ---------------------------------------------------------------------------
-if (!getApps().length) {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!raw) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON env var is not set');
+let db = null;
+let auth = null;
+let initError = null;
+
+// Lazy-init Firebase Admin — errors surface as HTTP 500, not cold-start crash
+function initFirebase() {
+  if (db && auth) return true;
+  if (initError) return false;
+  try {
+    const { initializeApp, getApps, cert } = require('firebase-admin/app');
+    const { getFirestore }                 = require('firebase-admin/firestore');
+    const { getAuth }                      = require('firebase-admin/auth');
+
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not set');
+
+    if (!getApps().length) {
+      initializeApp({ credential: cert(JSON.parse(raw)) });
+    }
+    db   = getFirestore();
+    auth = getAuth();
+    return true;
+  } catch (e) {
+    initError = e.message || String(e);
+    console.error('[ION] Firebase init failed:', initError);
+    return false;
   }
-  initializeApp({ credential: cert(JSON.parse(raw)) });
 }
 
-const db = getFirestore();
-
-// ---------------------------------------------------------------------------
 // Server-controlled pricing
-// ---------------------------------------------------------------------------
 const PLANS = {
   monthly:  { price: 15,  currency: 'INR', name: 'Monthly Pro'  },
   annual:   { price: 99,  currency: 'INR', name: 'Annual Pro'   },
   lifetime: { price: 150, currency: 'INR', name: 'Lifetime Pro' },
 };
 
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
 module.exports = async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -41,6 +48,11 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: { message: 'Method not allowed.' } });
   }
 
+  // Init Firebase lazily
+  if (!initFirebase()) {
+    return res.status(500).json({ error: { message: 'Server configuration error: ' + initError } });
+  }
+
   // 1. Auth
   const authHeader = req.headers.authorization || '';
   if (!authHeader.startsWith('Bearer ')) {
@@ -49,7 +61,7 @@ module.exports = async function handler(req, res) {
 
   let uid;
   try {
-    const decoded = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
+    const decoded = await auth.verifyIdToken(authHeader.split('Bearer ')[1]);
     uid = decoded.uid;
   } catch {
     return res.status(401).json({ error: { message: 'Invalid or expired Firebase ID token.' } });
@@ -96,8 +108,9 @@ module.exports = async function handler(req, res) {
   // 5. Razorpay API verification
   if (KEY_ID && KEY_ID !== 'test_key_id') {
     try {
-      const rzp     = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
-      const payment = await rzp.payments.fetch(paymentId);
+      const Razorpay = require('razorpay');
+      const rzp      = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
+      const payment  = await rzp.payments.fetch(paymentId);
 
       if (payment.status !== 'captured') {
         return res.status(402).json({ error: { message: `Payment not captured. Status: ${payment.status}` } });
@@ -110,13 +123,13 @@ module.exports = async function handler(req, res) {
         });
       }
     } catch (err) {
-      if (err && err.statusCode) throw err; // re-throw HttpsError-like errors
       console.error('[ION] Razorpay API error:', err && err.message);
       return res.status(500).json({ error: { message: 'Failed to verify payment with Razorpay.' } });
     }
   }
 
-  // 6. Atomic batch write: grant entitlement + mark order processed
+  // 6. Atomic batch write
+  const { FieldValue } = require('firebase-admin/firestore');
   const now = Date.now();
   const expiresAt =
     planId === 'monthly' ? now + 30  * 24 * 60 * 60 * 1000 :
