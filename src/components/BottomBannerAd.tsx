@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { subscribeToBannerConfig } from '../services/firebase';
 
 interface BottomBannerAdProps {
   isPro: boolean;
-  onUpgradeClick: () => void;
 }
 
 export const BottomBannerAd: React.FC<BottomBannerAdProps> = ({
@@ -12,23 +12,12 @@ export const BottomBannerAd: React.FC<BottomBannerAdProps> = ({
   const [bannerLinkUrl, setBannerLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      setBannerImageUrl(localStorage.getItem('custom_banner_image_url'));
-      setBannerLinkUrl(localStorage.getItem('custom_banner_link_url'));
-    };
+    const unsubscribe = subscribeToBannerConfig((data) => {
+      setBannerImageUrl(data.imageUrl);
+      setBannerLinkUrl(data.linkUrl);
+    });
     
-    // Initial load
-    handleStorageChange();
-    
-    // Listen for changes from other tabs
-    window.addEventListener('storage', handleStorageChange);
-    // Listen for custom event from same tab
-    window.addEventListener('banner_updated', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('banner_updated', handleStorageChange);
-    };
+    return () => unsubscribe();
   }, []);
 
   return (

@@ -38,5 +38,11 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
     }
+
+    // Global App Configuration (e.g. Ad Banners)
+    match /config/{configId} {
+      allow read: if true; // Anyone can see the ad
+      allow write: if true; // Client can update it from the admin panel
+    }
   }
 }

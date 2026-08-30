@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Image as ImageIcon, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, Save, Trash2, Cloud } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { updateBannerConfig, subscribeToBannerConfig } from '../services/firebase';
 
 interface AdminBannerScreenProps {
   onBack: () => void;
@@ -9,36 +10,44 @@ interface AdminBannerScreenProps {
 export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) => {
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setImageUrl(localStorage.getItem('custom_banner_image_url') || '');
-    setLinkUrl(localStorage.getItem('custom_banner_link_url') || '');
+    // Listen to current state from Firebase so admin knows what is live
+    const unsubscribe = subscribeToBannerConfig((data) => {
+      setImageUrl(data.imageUrl || '');
+      setLinkUrl(data.linkUrl || '');
+    });
+    
+    return () => unsubscribe();
   }, []);
 
-  const handleSave = () => {
-    if (imageUrl) {
-      localStorage.setItem('custom_banner_image_url', imageUrl);
-    } else {
-      localStorage.removeItem('custom_banner_image_url');
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateBannerConfig(imageUrl, linkUrl);
+      toast.success('Global Banner Settings Saved');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSaving(false);
     }
-    
-    if (linkUrl) {
-      localStorage.setItem('custom_banner_link_url', linkUrl);
-    } else {
-      localStorage.removeItem('custom_banner_link_url');
-    }
-    
-    window.dispatchEvent(new Event('banner_updated'));
-    toast.success('Banner Settings Saved');
   };
 
-  const handleClear = () => {
-    setImageUrl('');
-    setLinkUrl('');
-    localStorage.removeItem('custom_banner_image_url');
-    localStorage.removeItem('custom_banner_link_url');
-    window.dispatchEvent(new Event('banner_updated'));
-    toast.success('Banner Cleared');
+  const handleClear = async () => {
+    setIsSaving(true);
+    try {
+      await updateBannerConfig('', '');
+      setImageUrl('');
+      setLinkUrl('');
+      toast.success('Banner Cleared globally');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to clear banner');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -52,10 +61,10 @@ export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) 
             <ArrowLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
           </button>
           <div>
-            <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-              Admin Panel
+            <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight flex items-center gap-2">
+              Admin Panel <Cloud className="w-4 h-4 text-emerald-500" />
             </h1>
-            <p className="text-[10px] text-slate-500 font-medium">Manage Ad Banner</p>
+            <p className="text-[10px] text-slate-500 font-medium">Manage Global Ad Banner (Firebase)</p>
           </div>
         </div>
       </div>
@@ -66,7 +75,7 @@ export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) 
             <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
               <ImageIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h2 className="font-bold text-slate-800 dark:text-slate-200">Banner Configuration</h2>
+            <h2 className="font-bold text-slate-800 dark:text-slate-200">Global Banner Configuration</h2>
           </div>
 
           <div className="space-y-4">
@@ -98,14 +107,16 @@ export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) 
             <div className="pt-2 flex gap-3">
               <button 
                 onClick={handleSave}
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                disabled={isSaving}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Sync to Cloud'}
               </button>
               <button 
                 onClick={handleClear}
-                className="py-2.5 px-4 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-200 transition-colors"
+                disabled={isSaving}
+                className="py-2.5 px-4 bg-red-100 dark:bg-red-900/30 disabled:opacity-50 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-200 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -114,7 +125,7 @@ export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) 
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
-          <h2 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm">Live Preview</h2>
+          <h2 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm">Live Global Preview</h2>
           <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-800 min-h-[80px] p-2">
             {imageUrl ? (
               <img src={imageUrl} alt="Banner Preview" className="max-w-full max-h-24 object-contain" />
@@ -133,3 +144,4 @@ export const AdminBannerScreen: React.FC<AdminBannerScreenProps> = ({ onBack }) 
     </div>
   );
 };
+
