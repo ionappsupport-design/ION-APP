@@ -244,4 +244,5 @@ export type NavigationTab =
   | 'help_support'
   | 'category_detail'
   | 'upgrade_pro'
-  | 'device_performance';
+  | 'device_performance'
+  | 'admin_banner';

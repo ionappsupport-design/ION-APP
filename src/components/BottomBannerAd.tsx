@@ -1,6 +1,4 @@
-import React from 'react';
-import { Sparkles, Crown, Zap, Shield, ChevronRight } from 'lucide-react';
-import { NavigationTab } from '../types';
+import React, { useState, useEffect } from 'react';
 
 interface BottomBannerAdProps {
   isPro: boolean;
@@ -9,52 +7,53 @@ interface BottomBannerAdProps {
 
 export const BottomBannerAd: React.FC<BottomBannerAdProps> = ({
   isPro,
-  onUpgradeClick,
 }) => {
-  // If user is Pro or in active 7-Day Free Trial, do NOT show any banner ad
-  if (isPro) {
-    return null;
-  }
+  const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
+  const [bannerLinkUrl, setBannerLinkUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setBannerImageUrl(localStorage.getItem('custom_banner_image_url'));
+      setBannerLinkUrl(localStorage.getItem('custom_banner_link_url'));
+    };
+    
+    // Initial load
+    handleStorageChange();
+    
+    // Listen for changes from other tabs
+    window.addEventListener('storage', handleStorageChange);
+    // Listen for custom event from same tab
+    window.addEventListener('banner_updated', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('banner_updated', handleStorageChange);
+    };
+  }, []);
 
   return (
-    <div className="shrink-0 px-3 py-1.5 bg-slate-100 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
-      <div 
-        onClick={onUpgradeClick}
-        className="cursor-pointer group relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-900/60 via-slate-900 to-indigo-950/70 p-2.5 border border-blue-500/30 flex items-center justify-between shadow-sm hover:border-amber-500/50 transition-all"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 p-0.5 shrink-0 flex items-center justify-center shadow-md">
-            <div className="w-full h-full bg-slate-950 rounded-[6px] flex items-center justify-center">
-              <Crown className="w-4 h-4 text-amber-400 fill-amber-400" />
-            </div>
-          </div>
-
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-400 text-slate-950">
-                AD • ₹150 PRO
-              </span>
-              <span className="text-xs font-bold text-white truncate">
-                Upgrade to ION Lifetime Pro
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 truncate">
-              Remove all ads & unlock Turbo Video Compressor
-            </span>
-          </div>
-        </div>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpgradeClick();
-          }}
-          className="shrink-0 ml-2 px-2.5 py-1 rounded-lg bg-blue-600 group-hover:bg-amber-500 group-hover:text-slate-950 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-colors"
+    <div className="shrink-0 px-3 py-1.5 bg-slate-100 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-center items-center">
+      {bannerImageUrl ? (
+        <a 
+          href={bannerLinkUrl || '#'} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="w-full flex justify-center items-center"
         >
-          <span>₹150</span>
-          <ChevronRight className="w-3 h-3" />
-        </button>
-      </div>
+          <img 
+            src={bannerImageUrl} 
+            alt="Advertisement" 
+            className="w-full h-16 sm:h-20 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-800" 
+          />
+        </a>
+      ) : (
+        <div className="w-full text-center py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-xl shadow-lg border border-white/20 relative overflow-hidden flex items-center justify-center">
+           <div className="absolute inset-0 bg-white/10 opacity-50 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%,transparent_100%)] bg-[length:20px_20px] animate-[slide_1s_linear_infinite]" />
+           <span className="relative z-10 text-white font-black text-xs sm:text-sm uppercase tracking-widest drop-shadow-md">
+             *Your company's Advertisement Space^*
+           </span>
+        </div>
+      )}
     </div>
   );
 };

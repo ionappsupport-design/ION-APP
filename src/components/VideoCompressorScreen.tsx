@@ -171,6 +171,7 @@ export const VideoCompressorScreen: React.FC<VideoCompressorScreenProps> = ({
                     <span className="text-xs font-semibold px-4 text-center truncate w-full">{selectedVideo.name}</span>
                     <span className="text-[10px] text-slate-500 mt-1">Preview not available</span>
                   </div>
+                  )}
                 </div>
 
                 {/* Active Video Info */}

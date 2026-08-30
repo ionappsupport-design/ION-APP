@@ -45,6 +45,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
     { id: 'security' as NavigationTab, label: 'Security & Privacy', icon: ShieldCheck },
     { id: 'settings' as NavigationTab, label: 'Settings & Preferences', icon: Settings },
     { id: 'help_support' as NavigationTab, label: 'Help & Support', icon: HelpCircle },
+    { id: 'admin_banner' as NavigationTab, label: 'Admin Banner Panel', icon: Settings },
   ];
 
   return (

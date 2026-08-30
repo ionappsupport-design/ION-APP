@@ -239,7 +239,7 @@ export const AndroidFrame: React.FC<AndroidFrameProps> = ({
 
         {/* Bottom Banner Ad Placement (Displayed only for free tier, removed for Pro & 7-Day Free Trial) */}
         {!isSplashScreen && !isCleaningScreen && currentTab !== 'upgrade_pro' && (
-          <BottomBannerAd isPro={isPro} onUpgradeClick={() => onNavigate('upgrade_pro')} />
+          <BottomBannerAd isPro={isPro} />
         )}
 
         {/* Bottom 5-Tab Navigation Bar (Home | Clean | Files | Overview | Settings) */}

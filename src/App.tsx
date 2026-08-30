@@ -43,8 +43,8 @@ import { HelpSupportScreen } from './components/HelpSupportScreen';
 import { UpgradeProScreen } from './components/UpgradeProScreen';
 import { NavigationDrawer } from './components/NavigationDrawer';
 import { DevicePerformanceScreen } from './components/DevicePerformanceScreen';
+import { AdminBannerScreen } from './components/AdminBannerScreen';
 import { Toaster } from 'react-hot-toast';
-
 import { 
   INITIAL_DEVICE_FILES, 
   getRealStorageOverview, 
@@ -830,6 +830,13 @@ export default function App() {
         {currentTab === 'device_performance' && (
           <DevicePerformanceScreen
             systemMetrics={systemMetrics}
+            onBack={() => setCurrentTab('home')}
+          />
+        )}
+
+        {/* Screen 21: Admin Banner Panel */}
+        {currentTab === 'admin_banner' && (
+          <AdminBannerScreen
             onBack={() => setCurrentTab('home')}
           />
         )}
