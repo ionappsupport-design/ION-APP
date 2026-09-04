@@ -4,8 +4,8 @@ import { IonLogo } from './IonLogo';
 import { signInWithGoogle, getCurrentUser, UserProfile } from '../services/authService';
 
 interface SplashScreenProps {
-  onComplete?: () => void;
-  onFinish?: () => void;
+  onComplete?: (targetTab?: 'home' | 'auth') => void;
+  onFinish?: (targetTab?: 'home' | 'auth') => void;
   isReady?: boolean;
 }
 
@@ -21,38 +21,42 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     getCurrentUser().then(user => setUserProfile(user));
   }, []);
 
+  const handleProceed = (target?: 'home' | 'auth') => {
+    const nextTab = target || (userProfile?.email ? 'home' : 'auth');
+    if (onComplete) {
+      onComplete(nextTab);
+    } else if (onFinish) {
+      onFinish(nextTab);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
       setIsSigningIn(true);
       const profile = await signInWithGoogle();
       if (profile) {
         setUserProfile(profile);
+        handleProceed('home');
+      } else {
+        handleProceed('auth');
       }
-      handleProceed(); // Proceed regardless of sign-in result
     } catch (err) {
       console.error('Google Sign-In error:', err);
-      handleProceed(); // Don't block on auth error — proceed anyway
+      handleProceed('auth');
     } finally {
       setIsSigningIn(false);
-    }
-  };
-  const handleProceed = () => {
-    if (onComplete) {
-      onComplete();
-    } else if (onFinish) {
-      onFinish();
     }
   };
 
   useEffect(() => {
     if (isReady) {
-      // Auto-proceed after 2.5s — Google Sign-In is optional
+      // Auto-transition to Auth (or Home if already signed in) after 2s
       const timer = setTimeout(() => {
         handleProceed();
-      }, 2500);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isReady]);
+  }, [isReady, userProfile]);
 
   return (
     <div className="relative w-full h-full min-h-[600px] flex flex-col items-center justify-between p-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white select-none overflow-hidden transition-colors duration-300">

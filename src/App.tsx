@@ -44,6 +44,8 @@ import { UpgradeProScreen } from './components/UpgradeProScreen';
 import { NavigationDrawer } from './components/NavigationDrawer';
 import { DevicePerformanceScreen } from './components/DevicePerformanceScreen';
 import { AdminBannerScreen } from './components/AdminBannerScreen';
+import { AuthScreen } from './components/AuthScreen';
+import { onAuthStateChange, signOut, UserProfile, getLocalSession } from './services/authService';
 import { Toaster } from 'react-hot-toast';
 import { 
   INITIAL_DEVICE_FILES, 
@@ -86,11 +88,27 @@ export default function App() {
   const [lastFreedCount, setLastFreedCount] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getLocalSession());
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChange((user) => {
+      setCurrentUser(user);
+    });
+    return unsubscribe;
+  }, []);
+
   // Hardware Back Button Handler
   useEffect(() => {
     const backButtonListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
       if (currentTab === 'home' || currentTab === 'splash') {
         CapacitorApp.exitApp();
+      } else if (currentTab === 'auth') {
+        if (currentUser) {
+          setCurrentTab('home');
+        } else {
+          CapacitorApp.exitApp();
+        }
       } else if (currentTab === 'scan_results') {
         setCurrentTab('home');
       } else if (currentTab === 'review_select' || currentTab === 'social_cleaner') {
@@ -118,7 +136,7 @@ export default function App() {
     return () => {
       backButtonListener.then(listener => listener.remove());
     };
-  }, [currentTab, categoryDetailBackTab]);
+  }, [currentTab, categoryDetailBackTab, currentUser]);
 
   // Pro Membership State (Razorpay Entitlements)
   const [membership, setMembership] = useState<ProMembership>({
@@ -592,8 +610,24 @@ export default function App() {
         {/* Screen 1: Splash */}
         {currentTab === 'splash' && (
           <SplashScreen 
-            onFinish={() => setCurrentTab('home')} 
+            onFinish={(targetTab) => {
+              if (targetTab) {
+                setCurrentTab(targetTab);
+              } else if (currentUser) {
+                setCurrentTab('home');
+              } else {
+                setCurrentTab('auth');
+              }
+            }} 
             isReady={isAppReady}
+          />
+        )}
+
+        {/* Screen 1.5: Auth Screen (Sign In & Sign Up with Google Play Reviewer Demo Credentials) */}
+        {currentTab === 'auth' && (
+          <AuthScreen
+            onSuccess={() => setCurrentTab('home')}
+            onSkip={() => setCurrentTab('home')}
           />
         )}
 
@@ -794,6 +828,11 @@ export default function App() {
           <SettingsScreen
             settings={settings}
             membership={membership}
+            currentUser={currentUser}
+            onSignOut={() => {
+              signOut();
+              setCurrentTab('auth');
+            }}
             onUpdateSettings={handleUpdateSettings}
             onBack={() => setCurrentTab('home')}
             onNavigate={(tab) => setCurrentTab(tab)}
@@ -846,6 +885,12 @@ export default function App() {
         onClose={() => setIsDrawerOpen(false)}
         currentTab={currentTab}
         isPro={membership.isPro}
+        currentUser={currentUser}
+        onSignOut={() => {
+          signOut();
+          setIsDrawerOpen(false);
+          setCurrentTab('auth');
+        }}
         onNavigate={(tab) => {
           setCurrentTab(tab);
           setIsDrawerOpen(false);

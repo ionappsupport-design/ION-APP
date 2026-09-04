@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { NavigationTab, AuthUser, TrialState } from '../types';
+import { UserProfile } from '../services/authService';
 import { IonLogo } from './IonLogo';
 
 interface NavigationDrawerProps {
@@ -25,6 +26,8 @@ interface NavigationDrawerProps {
   currentTab: NavigationTab;
   onNavigate: (tab: NavigationTab) => void;
   isPro?: boolean;
+  currentUser?: UserProfile | null;
+  onSignOut?: () => void;
 }
 
 export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
@@ -33,6 +36,8 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
   currentTab,
   onNavigate,
   isPro = false,
+  currentUser = null,
+  onSignOut,
 }) => {
   const menuItems = [
     { id: 'home' as NavigationTab, label: 'Dashboard & Scanner', icon: Home },
@@ -80,6 +85,67 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
                 >
                   <X className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* User Account / Login Card */}
+              <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+                {currentUser && currentUser.email ? (
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                        {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div className="overflow-hidden">
+                        <div className="text-xs font-bold truncate text-slate-900 dark:text-white flex items-center gap-1">
+                          <span className="truncate">{currentUser.displayName || 'Verified User'}</span>
+                          {currentUser.isDemoTester && (
+                            <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-500 border border-cyan-500/30 shrink-0">
+                              DEMO
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                          {currentUser.email}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onSignOut?.();
+                        onClose();
+                      }}
+                      title="Sign Out"
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    onClick={() => {
+                      onNavigate('auth');
+                      onClose();
+                    }}
+                    className="cursor-pointer p-3 rounded-2xl bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-indigo-500/10 border border-cyan-500/30 flex items-center justify-between hover:border-cyan-500 active:scale-95 transition-all group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-cyan-500/20 text-cyan-500 flex items-center justify-center">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          Sign In / Demo Login
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          Reviewer credentials available
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500 text-white shadow-sm">
+                      LOGIN
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Pro Status / Upgrade Banner */}

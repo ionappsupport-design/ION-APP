@@ -46,7 +46,7 @@ export const AndroidFrame: React.FC<AndroidFrameProps> = ({
   children,
 }) => {
 
-  const isSplashScreen = currentTab === 'splash';
+  const isSplashScreen = currentTab === 'splash' || currentTab === 'auth';
   const isCleaningScreen = currentTab === 'cleaning';
 
   return (
@@ -139,6 +139,7 @@ export const AndroidFrame: React.FC<AndroidFrameProps> = ({
           </div>
 
           {[
+            { tab: 'auth' as NavigationTab, label: '0. Auth / Reviewer Access', desc: 'Sign in / Sign up & Demo login' },
             { tab: 'home' as NavigationTab, label: '1. Dashboard', desc: 'Storage gauge, RAM & Battery' },
             { tab: 'scan' as NavigationTab, label: '2. Scan Progress', desc: 'Realtime ION Ring animation' },
             { tab: 'scan_results' as NavigationTab, label: '3. Scan Results', desc: 'Junk breakdown & 1-tap clean' },

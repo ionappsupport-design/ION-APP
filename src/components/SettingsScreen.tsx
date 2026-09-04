@@ -10,13 +10,17 @@ import {
   Crown
 } from 'lucide-react';
 import { UserSettings, NavigationTab, ProMembership } from '../types';
+import { UserProfile } from '../services/authService';
 import { AdMob } from '@capacitor-community/admob';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
+import { User, LogOut, ShieldCheck } from 'lucide-react';
 
 interface SettingsScreenProps {
   settings: UserSettings;
   membership?: ProMembership;
+  currentUser?: UserProfile | null;
+  onSignOut?: () => void;
   onUpdateSettings: (newSettings: UserSettings) => void;
   onBack: () => void;
   onNavigate: (tab: NavigationTab) => void;
@@ -25,6 +29,8 @@ interface SettingsScreenProps {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   membership,
+  currentUser = null,
+  onSignOut,
   onUpdateSettings,
   onBack,
   onNavigate,
@@ -101,6 +107,73 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
+        {/* Section: Account & Authentication */}
+        <div className="space-y-2">
+          <h2 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-1">
+            Account & Security
+          </h2>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            {currentUser && currentUser.email ? (
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-sm">
+                    {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {currentUser.displayName || 'Authenticated User'}
+                      </span>
+                      {currentUser.isDemoTester && (
+                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-500 border border-cyan-500/30">
+                          REVIEWER DEMO
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {currentUser.email}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    onSignOut?.();
+                    toast.success('Signed out successfully');
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      Guest / Demo Mode
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Sign in or use Google Reviewer credentials
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onNavigate('auth')}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white dark:text-slate-950 text-xs font-bold shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Section 1: General */}
         <div className="space-y-2">

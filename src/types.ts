@@ -226,6 +226,7 @@ export interface UsageAnalyticsEvent {
 
 export type NavigationTab = 
   | 'splash'
+  | 'auth'
   | 'home' 
   | 'scan' 
   | 'scan_results'
