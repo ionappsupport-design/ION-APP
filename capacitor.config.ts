@@ -8,8 +8,6 @@ const config = {
       'checkout.razorpay.com',
       'api.razorpay.com',
       '*.razorpay.com',
-      'rzp.io',
-      '*.rzp.io',
       'accounts.google.com',
       '*.google.com',
       '*.firebaseapp.com',

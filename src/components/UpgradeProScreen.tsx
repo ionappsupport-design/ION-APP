@@ -17,7 +17,7 @@ import {
   FileText,
   X
 } from 'lucide-react';
-import { PaymentPlan, ProMembership, NavigationTab, SupportedRegion } from '../types';
+import { PaymentPlan, ProMembership, NavigationTab, SupportedRegion, RazorpaySuccessResponse } from '../types';
 import { 
   REGIONS, 
   getPlansForRegion, 
@@ -82,7 +82,7 @@ export const UpgradeProScreen: React.FC<UpgradeProScreenProps> = ({
     setErrorMsg(null);
 
     // Bypass backend and always use Payment Page since Firebase functions cannot be deployed on Spark Plan
-    openRazorpayPaymentPage(RAZORPAY_PAYMENT_PAGE_URL);
+    await openRazorpayPaymentPage(RAZORPAY_PAYMENT_PAGE_URL);
     setIsProcessing(false);
     setShowPaymentPendingModal(true);
   };
