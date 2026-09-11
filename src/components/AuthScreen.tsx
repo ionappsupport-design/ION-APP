@@ -101,15 +101,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, onSkip }) => 
         toast.success(`Signed in as ${user.displayName || user.email}`);
         onSuccess();
       }
-    } catch (err) {
-      console.warn('Google sign-in skipped/failed:', err);
-      // Fallback seamlessly so reviewer or user is never blocked
-      toast('Continuing with demo session...', { icon: 'ℹ️' });
-      await handleQuickDemoLogin();
+    } catch (err: any) {
+      console.warn('Google sign-in error:', err);
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('cancel') || msg.includes('16') || msg.includes('12501') || msg.includes('canceled') || msg.includes('cancelled')) {
+        toast('Sign-in cancelled', { icon: 'ℹ️' });
+      } else {
+        toast.error(err?.message || 'Google Sign-In could not be completed. Please try again or use Email / Demo.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const handleGuestContinue = async () => {
     try {
@@ -164,13 +168,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, onSkip }) => 
           </p>
         </div>
 
-        {/* GOOGLE PLAY REVIEWER / DEMO ACCESS BOX */}
+        {/* APP STORE REVIEWER / DEMO ACCESS BOX */}
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-indigo-500/10 dark:from-blue-900/30 dark:via-cyan-900/20 dark:to-indigo-900/30 border border-cyan-500/30 dark:border-cyan-500/40 shadow-sm space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-300">
-                Google Play Reviewer Access
+                Reviewer & Quick Demo Access
               </span>
             </div>
             <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30">

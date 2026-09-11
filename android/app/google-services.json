@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "994277632531-4dld0a0jno6rg4k905tm0q9i1guu899e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ioncleaner.app",
+            "certificate_hash": "b6a8b53d1fb4e9f752286d88eece4265376f10e2"
+          }
+        },
+        {
           "client_id": "994277632531-jfes1rr0a52khpjei7bgm5hkp1c6d9s1.apps.googleusercontent.com",
           "client_type": 3
         }

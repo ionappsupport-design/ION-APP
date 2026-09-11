@@ -12,6 +12,27 @@ const RAZORPAY_KEY_ID =
     ? import.meta.env.VITE_RAZORPAY_KEY_ID 
     : 'rzp_test_ion_cleaner_mock';
 
+export const RAZORPAY_PAYMENT_PAGE_URL = 
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_PAYMENT_PAGE)
+    ? import.meta.env.VITE_RAZORPAY_PAYMENT_PAGE
+    : 'https://rzp.io/rzp/M4nu6Rj';
+
+/**
+ * Open the official hosted Razorpay Payment Page (₹150 Lifetime Pro)
+ */
+export function openRazorpayPaymentPage(url: string = RAZORPAY_PAYMENT_PAGE_URL): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+  } catch (err) {
+    console.warn('Could not open payment page:', err);
+    if (typeof window !== 'undefined') {
+      window.location.href = url;
+    }
+  }
+}
+
 export interface RegionMetadata {
   id: SupportedRegion;
   name: string;
@@ -285,110 +306,120 @@ export async function openRazorpayCheckout({
 }: CheckoutOptions): Promise<void> {
   const isSDKLoaded = await loadRazorpaySDK();
 
+  if (!isSDKLoaded || !(window as any).Razorpay) {
+    onFailure({
+      reason: 'sdk_load_failed',
+      message: 'Failed to load Razorpay payment gateway. Please check your internet connection.',
+    });
+    return;
+  }
+
   const customerName = customerInfo?.name || 'ION Cleaner User';
-  const customerEmail = customerInfo?.email || 'alll.rounderone@gmail.com';
+  const customerEmail = customerInfo?.email || 'ionapp.support@gmail.com';
   const customerContact = customerInfo?.contact || '+91 7657026275';
 
-  if (isSDKLoaded && (window as any).Razorpay) {
+  let orderId: string | undefined = undefined;
+
+  const createOrderUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_CREATE_ORDER_URL) 
+    ? import.meta.env.VITE_CREATE_ORDER_URL 
+    : '';
+
+  if (createOrderUrl && !createOrderUrl.includes('your-project.vercel.app')) {
     try {
-      const options = {
-        key: RAZORPAY_KEY_ID,
-        amount: Math.round(plan.price * 100), // In smallest currency unit (paise/cents/pence: 150 INR = 15000 paise)
-        currency: plan.currency,
-        name: 'ION Cleaner Pro',
-        description: `${plan.title} - ${plan.tagline}`,
-        image: 'https://cdn-icons-png.flaticon.com/512/9440/9440384.png',
-        handler: function (response: any) {
-          if (response && response.razorpay_payment_id) {
-            onSuccess({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id || `order_ion_${Date.now()}`,
-              razorpay_signature: response.razorpay_signature || `sig_${Math.random().toString(36).substring(2, 10)}`,
-            });
-          } else {
-            onFailure({ reason: 'invalid_response', message: 'Payment response verification failed.' });
+      const token = await getIdToken();
+      const response = await fetch(createOrderUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          data: {
+            planId: plan.id,
           }
-        },
-        prefill: {
-          name: customerName,
-          email: customerEmail,
-          contact: customerContact,
-        },
-        notes: {
-          plan_id: plan.id,
-          plan_title: plan.title,
-          currency: plan.currency,
-          developer: 'Swayamjeet Nanda',
-          app_version: '3.0.0',
-        },
-        theme: {
-          color: '#2563EB',
-          backdrop_color: '#0F172A',
-        },
-        modal: {
-          ondismiss: function () {
-            onFailure({ reason: 'dismissed', message: 'Payment window was closed.' });
-          },
-          escape: true,
-          backdropclose: false,
-        },
-      };
-
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.on('payment.failed', function (resp: any) {
-        onFailure({
-          reason: 'payment_failed',
-          message: resp.error?.description || 'Payment was declined by bank or gateway.',
-        });
+        })
       });
-
-      razorpayInstance.open();
-      return;
-    } catch (e: any) {
-      console.warn('Error launching native Razorpay modal, triggering fallback simulator:', e);
+      
+      const json = await response.json();
+      if (!response.ok || (json.error && json.error.message)) {
+        throw new Error(json.error?.message || "Order creation failed.");
+      }
+      if (json.result && json.result.orderId) {
+        orderId = json.result.orderId;
+      }
+    } catch (err: any) {
+      console.warn('Backend order creation notice:', err);
+      onFailure({
+        reason: 'order_creation_failed',
+        message: err?.message || 'Could not initialize payment order securely from server.',
+      });
+      return; // Stop checkout if backend fails
     }
   }
 
-  // Graceful Sandbox / Test Mode Checkout Simulator when SDK CDN is blocked
-  simulateRazorpaySandboxCheckout({ plan, onSuccess, onFailure });
-}
+  try {
+    const options: any = {
+      key: RAZORPAY_KEY_ID,
+      amount: Math.round(plan.price * 100), // In smallest currency unit (paise: 150 INR = 15000 paise)
+      currency: plan.currency,
+      name: 'ION Cleaner Pro',
+      description: `${plan.title} - ${plan.tagline}`,
+      image: 'https://cdn-icons-png.flaticon.com/512/9440/9440384.png',
+      order_id: orderId, // <-- MANDATORY FOR MODERN RAZORPAY
+      handler: function (response: any) {
+        if (response && response.razorpay_payment_id) {
+          onSuccess({
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id || `order_ion_${Date.now()}`,
+            razorpay_signature: response.razorpay_signature || `sig_${Math.random().toString(36).substring(2, 10)}`,
+          });
+        } else {
+          onFailure({ reason: 'invalid_response', message: 'Payment response verification failed.' });
+        }
+      },
+      prefill: {
+        name: customerName,
+        email: customerEmail,
+        contact: customerContact,
+      },
+      notes: {
+        plan_id: plan.id,
+        plan_title: plan.title,
+        currency: plan.currency,
+        app_name: 'ION Cleaner',
+        app_version: '1.0.0',
+      },
+      theme: {
+        color: '#2563EB',
+        backdrop_color: '#0F172A',
+      },
+      modal: {
+        ondismiss: function () {
+          onFailure({ reason: 'dismissed', message: 'Payment window was closed.' });
+        },
+        escape: true,
+        backdropclose: false,
+      },
+    };
 
-function simulateRazorpaySandboxCheckout({
-  plan,
-  onSuccess,
-  onFailure,
-}: {
-  plan: PaymentPlan;
-  onSuccess: (response: RazorpaySuccessResponse) => void;
-  onFailure: (error: { reason: string; message: string }) => void;
-}) {
-  const confirmed = window.confirm(
-    `[Razorpay Gateway]\n\n` +
-    `Product: ION Cleaner Pro (${plan.title})\n` +
-    `Amount: ${plan.currencySymbol}${plan.price} ${plan.currency}\n\n` +
-    `Click OK to simulate Successful Payment.\n` +
-    `Click Cancel to simulate Cancelled Payment.`
-  );
-
-  if (confirmed) {
-    const mockPaymentId = `pay_test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const mockOrderId = `order_test_${Date.now()}`;
-    const mockSignature = `sig_test_${Math.random().toString(36).substring(2, 12)}`;
-    
-    setTimeout(() => {
-      onSuccess({
-        razorpay_payment_id: mockPaymentId,
-        razorpay_order_id: mockOrderId,
-        razorpay_signature: mockSignature,
+    const razorpayInstance = new (window as any).Razorpay(options);
+    razorpayInstance.on('payment.failed', function (resp: any) {
+      onFailure({
+        reason: 'payment_failed',
+        message: resp.error?.description || 'Payment was declined by bank or gateway.',
       });
-    }, 400);
-  } else {
+    });
+
+    razorpayInstance.open();
+  } catch (e: any) {
+    console.error('Error launching Razorpay modal:', e);
     onFailure({
-      reason: 'user_cancelled',
-      message: 'Transaction cancelled by user.',
+      reason: 'gateway_error',
+      message: e?.message || 'Could not open payment gateway.',
     });
   }
 }
+
 
 /**
  * Retrieve saved Pro membership entitlement from storage
@@ -474,41 +505,44 @@ export async function saveProMembership(
     expiresAt = null; // No expiry, lifetime access
   }
 
-  // --- SERVER AUTHORITATIVE VERIFICATION ---
-  let user = await getCurrentUser();
-  if (!user) {
-    user = await signInAnonymously();
-  }
-  
-  if (!user) {
-    throw new Error("Authentication failed. Cannot verify payment without a user account.");
-  }
+  // --- SERVER AUTHORITATIVE VERIFICATION (when backend endpoint configured) ---
+  const functionUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_VERIFY_PAYMENT_URL) 
+    ? import.meta.env.VITE_VERIFY_PAYMENT_URL 
+    : '';
 
-  const token = await getIdToken();
-  const functionUrl = import.meta.env.VITE_VERIFY_PAYMENT_URL || 'https://your-project.vercel.app/api/verifyPayment';
-  
-  const response = await fetch(functionUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      data: {
-        planId: plan.id,
-        paymentId: razorpayResponse.razorpay_payment_id,
-        orderId: razorpayResponse.razorpay_order_id,
-        signature: razorpayResponse.razorpay_signature,
+  if (functionUrl && !functionUrl.includes('your-project.vercel.app')) {
+    try {
+      const token = await getIdToken();
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          data: {
+            planId: plan.id,
+            paymentId: razorpayResponse.razorpay_payment_id,
+            orderId: razorpayResponse.razorpay_order_id,
+            signature: razorpayResponse.razorpay_signature,
+          }
+        })
+      });
+      
+      const json = await response.json();
+      if (!response.ok || (json.error && json.error.message)) {
+        console.error('Server verification failed:', json);
+        throw new Error(json.error?.message || "Payment signature verification failed.");
       }
-    })
-  });
-  
-  const json = await response.json();
-  if (!response.ok || (json.error && json.error.message)) {
-    console.error('Server verification failed:', json);
-    throw new Error(json.error?.message || "Payment verification failed or network is unreachable.");
+    } catch (err: any) {
+      console.warn('Backend payment verification notice:', err);
+      if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+        throw err;
+      }
+    }
   }
   // -----------------------------------------
+
 
   // Only proceed to cache in localStorage AFTER server validation succeeds.
   // We trust the server's response for the final membership object, but for now 

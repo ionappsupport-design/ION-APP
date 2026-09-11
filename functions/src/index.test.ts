@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HttpsError } from "firebase-functions/v2/https";
 
 // Mock Firebase Admin
 vi.mock('firebase-admin', () => ({
   initializeApp: vi.fn(),
 }));
 
-const { mockGet, mockSet, mockRunTransaction, mockBatchSet, mockBatchCommit } = vi.hoisted(() => ({
-  mockGet: vi.fn(),
+const { mockSet, mockRunTransaction, mockBatchSet, mockBatchCommit } = vi.hoisted(() => ({
   mockSet: vi.fn(),
   mockRunTransaction: vi.fn(),
   mockBatchSet: vi.fn(),

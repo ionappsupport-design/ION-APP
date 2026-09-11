@@ -13,7 +13,7 @@ export interface UserProfile {
 export const DEMO_REVIEWER_CREDENTIALS = {
   email: 'reviewer@ioncleaner.app',
   password: 'IonReviewer2026!',
-  displayName: 'Google Play Reviewer',
+  displayName: 'App Store Reviewer',
 };
 
 const AUTH_STORAGE_KEY = 'ion_auth_user_session_v1';
@@ -86,48 +86,33 @@ export async function signInWithEmail(email: string, pass: string): Promise<User
     return demoUser;
   }
 
-  // Standard Email Authentication with graceful local persistence fallback
+  // Standard Email Authentication
   try {
-    // Attempt Firebase native auth if supported
     if (Capacitor.isNativePlatform()) {
-      try {
-        const res = await (FirebaseAuthentication as any).signInWithEmailAndPassword?.({
-          email: trimmedEmail,
-          password: pass
-        });
-        if (res?.user) {
-          const user: UserProfile = {
-            uid: res.user.uid,
-            email: res.user.email,
-            displayName: res.user.displayName || trimmedEmail.split('@')[0],
-            photoUrl: res.user.photoUrl || null,
-            provider: 'email'
-          };
-          saveLocalSession(user);
-          notifyListeners(user);
-          return user;
-        }
-      } catch (nativeErr) {
-        console.warn('Native Firebase email sign-in failed, using session auth:', nativeErr);
+      const res = await (FirebaseAuthentication as any).signInWithEmailAndPassword?.({
+        email: trimmedEmail,
+        password: pass
+      });
+      if (res?.user) {
+        const user: UserProfile = {
+          uid: res.user.uid,
+          email: res.user.email,
+          displayName: res.user.displayName || trimmedEmail.split('@')[0],
+          photoUrl: res.user.photoUrl || null,
+          provider: 'email'
+        };
+        saveLocalSession(user);
+        notifyListeners(user);
+        return user;
       }
+      throw new Error("Login failed. No user returned.");
+    } else {
+      throw new Error("Email login is only supported on native platforms in this configuration.");
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Firebase signInWithEmail exception:', err);
+    throw new Error(err?.message || "Invalid credentials or network error.");
   }
-
-  // Local Authoritative Session (Ensures zero login blocker during Play Review)
-  const username = trimmedEmail.split('@')[0] || 'Member';
-  const formattedName = username.charAt(0).toUpperCase() + username.slice(1);
-  const user: UserProfile = {
-    uid: 'user_' + Math.abs(trimmedEmail.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)).toString(36),
-    email: trimmedEmail,
-    displayName: formattedName,
-    photoUrl: null,
-    provider: 'email'
-  };
-  saveLocalSession(user);
-  notifyListeners(user);
-  return user;
 }
 
 export async function signUpWithEmail(email: string, pass: string, name?: string): Promise<UserProfile> {
@@ -143,41 +128,30 @@ export async function signUpWithEmail(email: string, pass: string, name?: string
 
   try {
     if (Capacitor.isNativePlatform()) {
-      try {
-        const res = await (FirebaseAuthentication as any).createUserWithEmailAndPassword?.({
-          email: trimmedEmail,
-          password: pass
-        });
-        if (res?.user) {
-          const user: UserProfile = {
-            uid: res.user.uid,
-            email: res.user.email,
-            displayName: displayName,
-            photoUrl: null,
-            provider: 'email'
-          };
-          saveLocalSession(user);
-          notifyListeners(user);
-          return user;
-        }
-      } catch (nativeErr) {
-        console.warn('Native createUserWithEmailAndPassword failed, using session auth:', nativeErr);
+      const res = await (FirebaseAuthentication as any).createUserWithEmailAndPassword?.({
+        email: trimmedEmail,
+        password: pass
+      });
+      if (res?.user) {
+        const user: UserProfile = {
+          uid: res.user.uid,
+          email: res.user.email,
+          displayName: displayName,
+          photoUrl: null,
+          provider: 'email'
+        };
+        saveLocalSession(user);
+        notifyListeners(user);
+        return user;
       }
+      throw new Error("Signup failed. No user returned.");
+    } else {
+      throw new Error("Email signup is only supported on native platforms in this configuration.");
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Firebase createUser exception:', err);
+    throw new Error(err?.message || "Could not create account. Email may already be in use.");
   }
-
-  const user: UserProfile = {
-    uid: 'user_' + Math.abs(trimmedEmail.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)).toString(36),
-    email: trimmedEmail,
-    displayName: displayName,
-    photoUrl: null,
-    provider: 'email'
-  };
-  saveLocalSession(user);
-  notifyListeners(user);
-  return user;
 }
 
 export async function signInWithDemoCredentials(): Promise<UserProfile> {
@@ -208,26 +182,56 @@ export async function signInAsGuest(): Promise<UserProfile> {
 }
 
 export async function signInWithGoogle(): Promise<UserProfile | null> {
-  try {
-    const result = await FirebaseAuthentication.signInWithGoogle();
-    if (result.user) {
-      const profile: UserProfile = {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoUrl: result.user.photoUrl,
-        provider: 'google'
-      };
-      saveLocalSession(profile);
-      notifyListeners(profile);
-      return profile;
-    }
-    return null;
-  } catch (error) {
-    console.error('Google Sign-In failed:', error);
-    throw error;
+  // Web preview mode simulation
+  if (!Capacitor.isNativePlatform()) {
+    const webUser: UserProfile = {
+      uid: 'web_google_user_' + Date.now().toString(36),
+      email: 'user@gmail.com',
+      displayName: 'Google User',
+      photoUrl: null,
+      provider: 'google'
+    };
+    saveLocalSession(webUser);
+    notifyListeners(webUser);
+    return webUser;
   }
+
+  let result: any = null;
+
+  // 1. Attempt Android Credential Manager / native Google Sign-In
+  try {
+    result = await FirebaseAuthentication.signInWithGoogle({
+      useCredentialManager: true
+    });
+  } catch (credMgrErr: any) {
+    console.warn('Google Sign-In Credential Manager attempt notice:', credMgrErr);
+    
+    // 2. Fallback: If Credential Manager fails or account is unlinked, fallback to standard intent
+    try {
+      result = await FirebaseAuthentication.signInWithGoogle({
+        useCredentialManager: false
+      });
+    } catch (legacyErr: any) {
+      console.error('Google Sign-In fallback intent error:', legacyErr);
+      throw legacyErr;
+    }
+  }
+
+  if (result && result.user) {
+    const profile: UserProfile = {
+      uid: result.user.uid,
+      email: result.user.email,
+      displayName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'User'),
+      photoUrl: result.user.photoUrl || null,
+      provider: 'google'
+    };
+    saveLocalSession(profile);
+    notifyListeners(profile);
+    return profile;
+  }
+  return null;
 }
+
 
 export async function signInAnonymously(): Promise<UserProfile | null> {
   try {

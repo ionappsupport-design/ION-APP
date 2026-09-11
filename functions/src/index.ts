@@ -183,6 +183,48 @@ export const verifyPaymentCore = async (request: any, db: FirebaseFirestore.Fire
   }
 };
 
-export const verifyRazorpayPayment = onCall(async (request) => {
+export const verifyRazorpayPayment = onCall(async (request: any) => {
   return verifyPaymentCore(request, db, RAZORPAY_KEY_SECRET, RAZORPAY_KEY_ID, razorpay);
+});
+
+export const createRazorpayOrder = onCall(async (request: any) => {
+  // 1. Authenticate Request
+  if (!request.auth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "User must be signed in to create an order."
+    );
+  }
+
+  // 2. Validate Input
+  const { planId } = request.data as any;
+  if (!planId) {
+    throw new HttpsError("invalid-argument", "Missing planId.");
+  }
+
+  const expectedPlan = PLANS[planId];
+  if (!expectedPlan) {
+    throw new HttpsError("invalid-argument", `Invalid plan ID: ${planId}`);
+  }
+
+  // 3. Create Order via Razorpay
+  try {
+    const options = {
+      amount: expectedPlan.price * 100, // paise
+      currency: expectedPlan.currency,
+      receipt: `receipt_${request.auth.uid.substring(0, 5)}_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    return {
+      success: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency
+    };
+  } catch (error: any) {
+    console.error("Razorpay Order Creation Failed:", error);
+    throw new HttpsError("internal", "Failed to create order with Razorpay.");
+  }
 });
