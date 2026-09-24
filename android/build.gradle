@@ -29,3 +29,20 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+allprojects {
+    afterEvaluate { project ->
+        if (project.name == 'capacitor-community-admob') {
+            project.tasks.matching { it.name.startsWith("compile") }.configureEach { compileTask ->
+                compileTask.doFirst {
+                    def patchSrc = new File(rootProject.projectDir, "patches/BannerExecutor.java")
+                    def dest = new File(project.projectDir, "src/main/java/com/getcapacitor/community/admob/banner/BannerExecutor.java")
+                    if (patchSrc.exists() && dest.parentFile.exists()) {
+                        dest.text = patchSrc.text
+                    }
+                }
+            }
+        }
+    }
+}
+

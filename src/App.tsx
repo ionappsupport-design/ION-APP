@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   checkNativePlatform, 
   requestNativeStoragePermissions, 
@@ -158,6 +158,9 @@ export default function App() {
 
   // Core Data State
   const [isAppReady, setIsAppReady] = useState(false);
+  const [isAdMobInitialized, setIsAdMobInitialized] = useState(false);
+  const isBannerVisibleRef = useRef<boolean>(false);
+  const bannerOperationLockRef = useRef<Promise<void>>(Promise.resolve());
   const [isNativeScanning, setIsNativeScanning] = useState(false);
   const [files, setFiles] = useState<ScannedFile[]>(() => {
     try {
@@ -279,16 +282,21 @@ export default function App() {
       (async () => {
         try {
           if (Capacitor.getPlatform() !== 'web') {
-            const consentInfo = await AdMob.requestConsentInfo();
-            if (consentInfo.isConsentFormAvailable && consentInfo.status === 'REQUIRED') {
-              await AdMob.showConsentForm();
+            try {
+              const consentInfo = await AdMob.requestConsentInfo();
+              if (consentInfo.isConsentFormAvailable && consentInfo.status === 'REQUIRED') {
+                await AdMob.showConsentForm();
+              }
+            } catch (consentErr) {
+              console.warn("AdMob consent flow failed, proceeding with init", consentErr);
             }
           }
           await AdMob.initialize({
             initializeForTesting: false,
           });
+          setIsAdMobInitialized(true);
         } catch (e) {
-          console.error("AdMob initialization/consent failed", e);
+          console.error("AdMob initialization failed", e);
         }
       })()
     ]).then(() => {
@@ -299,29 +307,61 @@ export default function App() {
     });
   }, []);
 
-  // AdMob Banner Logic
+  // AdMob Banner Lifecycle Management
   useEffect(() => {
-    const manageAdMob = async () => {
-      try {
-        if (membership.isPro || currentTab === 'splash' || currentTab === 'cleaning' || currentTab === 'upgrade_pro') {
-          await AdMob.hideBanner().catch(() => {});
+    if (!isAppReady || !isAdMobInitialized || Capacitor.getPlatform() === 'web') {
+      return;
+    }
+
+    const shouldShowBanner =
+      !membership.isPro &&
+      currentTab !== 'splash' &&
+      currentTab !== 'cleaning' &&
+      currentTab !== 'upgrade_pro';
+
+    bannerOperationLockRef.current = bannerOperationLockRef.current
+      .then(async () => {
+        if (shouldShowBanner) {
+          if (!isBannerVisibleRef.current) {
+            try {
+              await AdMob.showBanner({
+                adId: 'ca-app-pub-4120562777721944/7070570681', 
+                adSize: BannerAdSize.BANNER,
+                position: BannerAdPosition.BOTTOM_CENTER,
+                margin: 0,
+                isTesting: false 
+              });
+              isBannerVisibleRef.current = true;
+            } catch (e) {
+              console.warn('AdMob showBanner failed', e);
+            }
+          }
         } else {
-          await AdMob.showBanner({
-            adId: 'ca-app-pub-4120562777721944/7070570681', 
-            adSize: BannerAdSize.BANNER,
-            position: BannerAdPosition.BOTTOM_CENTER,
-            margin: 0,
-            isTesting: false 
-          }).catch(() => {});
+          if (isBannerVisibleRef.current) {
+            try {
+              await AdMob.hideBanner();
+              isBannerVisibleRef.current = false;
+            } catch (e) {
+              console.warn('AdMob hideBanner failed', e);
+            }
+          }
         }
-      } catch (e) {
-        console.error('AdMob Error', e);
+      })
+      .catch((err) => {
+        console.warn('AdMob queue error', err);
+      });
+  }, [currentTab, membership.isPro, isAppReady, isAdMobInitialized]);
+
+  // Clean up banner on root app unmount
+  useEffect(() => {
+    return () => {
+      if (Capacitor.getPlatform() !== 'web') {
+        AdMob.removeBanner().catch((error) => {
+          console.warn('AdMob banner cleanup failed', error);
+        });
       }
     };
-    if (isAppReady) {
-      manageAdMob();
-    }
-  }, [currentTab, membership.isPro, isAppReady]);
+  }, []);
 
   // Sync files to storage
   const updateFiles = useCallback((newFiles: ScannedFile[]) => {
